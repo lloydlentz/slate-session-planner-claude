@@ -2,7 +2,7 @@
 import { getState, setState } from './state.js';
 import { getSessionTypes } from './data.js';
 import { renderSettings } from './settings.js';
-import { renderSessions, buildTypeColorMap } from './sessions.js';
+import { renderSessions } from './sessions.js';
 
 const views = {
   sessions: document.getElementById('view-sessions'),

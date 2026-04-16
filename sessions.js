@@ -1,5 +1,5 @@
 // Sessions view
-import { getState, getPreference, setPreference, getNote, setNote, cycleStatus } from './state.js';
+import { getState, setPreference, setNote, cycleStatus } from './state.js';
 import { getSessionTypes } from './data.js';
 
 export function filterSessions(sessions, filters, preferences, team) {
