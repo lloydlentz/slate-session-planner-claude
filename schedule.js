@@ -44,8 +44,11 @@ export function renderSchedule(container, sessions, memberFilter = 'All') {
       tbdSessions.push({ session, goingMembers });
       return;
     }
-    if (grid[session.day][hour]) {
-      grid[session.day][hour].push({ session, goingMembers });
+    const slot = grid[session.day]?.[hour];
+    if (slot) {
+      slot.push({ session, goingMembers });
+    } else {
+      tbdSessions.push({ session, goingMembers });
     }
   });
 
@@ -112,7 +115,7 @@ export function renderSchedule(container, sessions, memberFilter = 'All') {
         <div class="tooltip-title">${escHtml(s.title)}</div>
         ${s.speakers.length ? `<div class="tooltip-speaker">${escHtml(s.speakers.join(', '))}</div>` : ''}
         ${s.description ? `<div class="tooltip-desc">${escHtml(s.description.slice(0, 200))}${s.description.length > 200 ? '…' : ''}</div>` : ''}
-        <div class="tooltip-meta">${escHtml(s.type)} · ${escHtml(s.dayLabel)} ${escHtml(s.time)} · ${escHtml(s.location)}</div>
+        <div class="tooltip-meta">${escHtml(s.type)} · ${escHtml(s.dayLabel)} · ${escHtml(s.time)} · ${escHtml(s.location)}</div>
       `;
       tooltip.classList.remove('hidden');
       positionTooltip(e, tooltip);
