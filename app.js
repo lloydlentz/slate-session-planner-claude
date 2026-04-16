@@ -103,6 +103,8 @@ const state = getState();
 if (state.sessionsCache) {
   allSessions = state.sessionsCache;
   rebuildPillGroup('filter-type', getSessionTypes(allSessions));
+}
+if (state.team.length > 0) {
   rebuildPillGroup('filter-member', state.team);
 }
 showView('sessions');

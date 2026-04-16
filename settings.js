@@ -1,5 +1,5 @@
 // Settings panel
-import { getState, setState } from './state.js';
+import { getState, setState, exportData } from './state.js';
 import { fetchSessions } from './data.js';
 
 export function renderSettings(container, { onTeamSaved, onSessionsLoaded }) {
@@ -9,7 +9,7 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded }) {
     <div class="settings-container">
 
       <div class="settings-section" id="section-team">
-        <div class="settings-section-header" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.toggle').textContent = this.nextElementSibling.classList.contains('hidden') ? '▶' : '▼'">
+        <div class="settings-section-header">
           <h3>Team Members</h3>
           <span class="toggle">${state.team.length > 0 ? '▶' : '▼'}</span>
         </div>
@@ -28,7 +28,7 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded }) {
       </div>
 
       <div class="settings-section" id="section-endpoint">
-        <div class="settings-section-header" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.toggle').textContent = this.nextElementSibling.classList.contains('hidden') ? '▶' : '▼'">
+        <div class="settings-section-header">
           <h3>Session Data</h3>
           <span class="toggle">${state.sessionsCache ? '▶' : '▼'}</span>
         </div>
@@ -46,7 +46,7 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded }) {
       </div>
 
       <div class="settings-section">
-        <div class="settings-section-header" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.toggle').textContent = this.nextElementSibling.classList.contains('hidden') ? '▶' : '▼'">
+        <div class="settings-section-header">
           <h3>Export Data</h3>
           <span class="toggle">▶</span>
         </div>
@@ -60,6 +60,15 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded }) {
 
     </div>
   `;
+
+  // Attach collapse toggle handlers
+  container.querySelectorAll('.settings-section-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const body = header.nextElementSibling;
+      body.classList.toggle('hidden');
+      header.querySelector('.toggle').textContent = body.classList.contains('hidden') ? '▶' : '▼';
+    });
+  });
 
   // --- Team management ---
   let pendingTeam = [...state.team];
@@ -132,15 +141,13 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded }) {
 
   // --- Export ---
   container.querySelector('#export-btn').addEventListener('click', () => {
-    import('./state.js').then(({ exportData }) => {
-      const blob = new Blob([exportData()], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'conference-planner-data.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    const blob = new Blob([exportData()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'conference-planner-data.json';
+    a.click();
+    URL.revokeObjectURL(url);
   });
 }
 
@@ -155,5 +162,5 @@ function renderTeamList(team) {
 }
 
 function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
