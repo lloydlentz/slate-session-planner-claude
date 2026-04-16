@@ -115,5 +115,52 @@ export async function runTests() {
     assertEqual(getSessionTypes(sessions), ['Plenary', 'Workshop']);
   });
 
+  // --- sessions.js filter tests ---
+  const { filterSessions } = await import('./sessions.js');
+
+  const mockSessions = [
+    { id: 's1', day: 'Wednesday', type: 'Plenary', title: 'Keynote' },
+    { id: 's2', day: 'Thursday',  type: 'Workshop', title: 'Deep Dive' },
+    { id: 's3', day: 'Wednesday', type: 'Workshop', title: 'Hands On' },
+  ];
+  const mockPrefs = {
+    s1: { Lloyd: 'going', Kathryn: 'interested' },
+    s2: { Lloyd: 'interested' },
+  };
+  const mockTeam = ['Lloyd', 'Kathryn'];
+
+  test('filterSessions: All filters → all sessions', () => {
+    const r = filterSessions(mockSessions, { day:'All', type:'All', member:'All', status:'All' }, mockPrefs, mockTeam);
+    assertEqual(r.length, 3);
+  });
+
+  test('filterSessions: filter by day', () => {
+    const r = filterSessions(mockSessions, { day:'Wednesday', type:'All', member:'All', status:'All' }, mockPrefs, mockTeam);
+    assertEqual(r.length, 2);
+  });
+
+  test('filterSessions: filter by type', () => {
+    const r = filterSessions(mockSessions, { day:'All', type:'Workshop', member:'All', status:'All' }, mockPrefs, mockTeam);
+    assertEqual(r.length, 2);
+  });
+
+  test('filterSessions: member filter hides none-status sessions', () => {
+    const r = filterSessions(mockSessions, { day:'All', type:'All', member:'Lloyd', status:'All' }, mockPrefs, mockTeam);
+    assertEqual(r.length, 2);
+    assert(r.every(s => s.id !== 's3'));
+  });
+
+  test('filterSessions: member + status filter', () => {
+    const r = filterSessions(mockSessions, { day:'All', type:'All', member:'Lloyd', status:'going' }, mockPrefs, mockTeam);
+    assertEqual(r.length, 1);
+    assertEqual(r[0].id, 's1');
+  });
+
+  test('filterSessions: All member + status=going shows any-member going', () => {
+    const r = filterSessions(mockSessions, { day:'All', type:'All', member:'All', status:'going' }, mockPrefs, mockTeam);
+    assertEqual(r.length, 1);
+    assertEqual(r[0].id, 's1');
+  });
+
   return results();
 }

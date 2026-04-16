@@ -2,6 +2,7 @@
 import { getState, setState } from './state.js';
 import { getSessionTypes } from './data.js';
 import { renderSettings } from './settings.js';
+import { renderSessions, buildTypeColorMap } from './sessions.js';
 
 const views = {
   sessions: document.getElementById('view-sessions'),
@@ -42,7 +43,9 @@ function getActiveFilters() {
 }
 
 function renderSessionsView() {
-  views.sessions.innerHTML = `<p style="color:var(--text-muted);padding:20px">Sessions view coming soon…</p>`;
+  renderSessions(views.sessions, allSessions, getActiveFilters(), () => {
+    if (activeView === 'schedule') renderScheduleView();
+  });
 }
 
 function renderScheduleView() {
