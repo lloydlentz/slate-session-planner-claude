@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header id="top-bar">
+  <header id="top-bar" aria-label="Application">
     <div id="brand">Conference Planner</div>
     <nav id="main-nav">
       <a href="#" class="nav-link active" data-view="sessions">Sessions</a>
@@ -18,8 +18,8 @@
 
   <div id="filter-strip" class="hidden">
     <div class="filter-group">
-      <label>Day</label>
-      <div id="filter-day" class="filter-pills">
+      <span id="label-day" class="filter-label">Day</span>
+      <div id="filter-day" class="filter-pills" role="group" aria-labelledby="label-day">
         <button class="pill active" data-value="All">All</button>
         <button class="pill" data-value="Wednesday">Wed</button>
         <button class="pill" data-value="Thursday">Thu</button>
@@ -27,18 +27,18 @@
       </div>
     </div>
     <div class="filter-group">
-      <label>Type</label>
-      <div id="filter-type" class="filter-pills"></div>
+      <span id="label-type" class="filter-label">Type</span>
+      <div id="filter-type" class="filter-pills" role="group" aria-labelledby="label-type"></div>
     </div>
     <div class="filter-group">
-      <label>Member</label>
-      <div id="filter-member" class="filter-pills">
+      <span id="label-member" class="filter-label">Member</span>
+      <div id="filter-member" class="filter-pills" role="group" aria-labelledby="label-member">
         <button class="pill active" data-value="All">All</button>
       </div>
     </div>
     <div class="filter-group">
-      <label>Status</label>
-      <div id="filter-status" class="filter-pills">
+      <span id="label-status" class="filter-label">Status</span>
+      <div id="filter-status" class="filter-pills" role="group" aria-labelledby="label-status">
         <button class="pill active" data-value="All">All</button>
         <button class="pill" data-value="interested">Interested</button>
         <button class="pill" data-value="going">Going</button>
