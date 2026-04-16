@@ -1,6 +1,6 @@
 // app.js
 import { getState, setState } from './state.js';
-import { getSessionTypes } from './data.js';
+import { getSessionTypes, fetchSessions } from './data.js';
 import { renderSettings } from './settings.js';
 import { renderSchedule } from './schedule.js';
 import { renderSessions } from './sessions.js';
@@ -108,8 +108,27 @@ const state = getState();
 if (state.sessionsCache) {
   allSessions = state.sessionsCache;
   rebuildPillGroup('filter-type', getSessionTypes(allSessions));
+  if (state.team.length > 0) {
+    rebuildPillGroup('filter-member', state.team);
+  }
+  showView('sessions');
+} else {
+  // No cache — auto-fetch on first visit
+  showView('sessions');
+  views.sessions.innerHTML = `<div class="loading">Loading sessions…</div>`;
+  fetchSessions(state.endpoint)
+    .then(sessions => {
+      setState(s => ({ ...s, sessionsCache: sessions, sessionsCachedAt: Date.now() }));
+      allSessions = sessions;
+      rebuildPillGroup('filter-type', getSessionTypes(sessions));
+      if (state.team.length > 0) {
+        rebuildPillGroup('filter-member', state.team);
+      }
+      renderSessionsView();
+    })
+    .catch(err => {
+      views.sessions.innerHTML = `
+        <div class="error-msg">Failed to load sessions: ${err.message}</div>
+        <div class="empty-state"><h3>Could not load sessions</h3><p>Go to ⚙ Settings to configure the data endpoint and try again.</p></div>`;
+    });
 }
-if (state.team.length > 0) {
-  rebuildPillGroup('filter-member', state.team);
-}
-showView('sessions');
