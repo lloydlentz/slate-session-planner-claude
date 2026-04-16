@@ -15,6 +15,7 @@ const filterStrip = document.getElementById('filter-strip');
 
 let allSessions = [];
 let activeView = 'sessions';
+let fetchInProgress = false;
 
 function showView(name) {
   // Remove any lingering tooltip
@@ -44,6 +45,7 @@ function getActiveFilters() {
 }
 
 function renderSessionsView() {
+  if (fetchInProgress) return;
   renderSessions(views.sessions, allSessions, getActiveFilters(), () => {
     if (activeView === 'schedule') renderScheduleView();
   });
@@ -114,19 +116,23 @@ if (state.sessionsCache) {
   showView('sessions');
 } else {
   // No cache — auto-fetch on first visit
-  showView('sessions');
+  fetchInProgress = true;
+  showView('sessions'); // renderSessionsView skips due to fetchInProgress flag
   views.sessions.innerHTML = `<div class="loading">Loading sessions…</div>`;
   fetchSessions(state.endpoint)
     .then(sessions => {
+      fetchInProgress = false;
       setState(s => ({ ...s, sessionsCache: sessions, sessionsCachedAt: Date.now() }));
       allSessions = sessions;
       rebuildPillGroup('filter-type', getSessionTypes(sessions));
-      if (state.team.length > 0) {
-        rebuildPillGroup('filter-member', state.team);
+      const currentTeam = getState().team;
+      if (currentTeam.length > 0) {
+        rebuildPillGroup('filter-member', currentTeam);
       }
       renderSessionsView();
     })
     .catch(err => {
+      fetchInProgress = false;
       views.sessions.innerHTML = `
         <div class="error-msg">Failed to load sessions: ${err.message}</div>
         <div class="empty-state"><h3>Could not load sessions</h3><p>Go to ⚙ Settings to configure the data endpoint and try again.</p></div>`;
