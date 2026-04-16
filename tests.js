@@ -50,5 +50,70 @@ export async function runTests() {
     assertEqual(cycleStatus('bogus'), 'none');
   });
 
+  // --- data.js tests ---
+  const { normalizeSession, parseHour, getSessionTypes } = await import('./data.js');
+
+  test('normalizeSession: maps all fields', () => {
+    const raw = {
+      guid: 'abc-123',
+      Type: 'Slate Summit Plenary',
+      Title: '  Opening Session  ',
+      Description: '\n  Great talk.\n',
+      Day: 'Wednesday',
+      Time: '9:00 AM',
+      Location: 'Hall D',
+      Speakers: 'Jane Smith\nBob Jones'
+    };
+    const s = normalizeSession(raw);
+    assertEqual(s.id, 'abc-123');
+    assertEqual(s.title, 'Opening Session');
+    assertEqual(s.description, 'Great talk.');
+    assertEqual(s.dayLabel, 'Wed');
+    assertEqual(s.dayDate, 'June 24');
+    assertEqual(s.time, '9:00 AM');
+    assertEqual(s.speakers, ['Jane Smith', 'Bob Jones']);
+  });
+
+  test('normalizeSession: handles missing Speakers', () => {
+    const raw = { guid: 'x', Type: 'T', Title: 'T', Description: '', Day: 'Friday', Time: '2:00 PM', Location: '' };
+    assertEqual(normalizeSession(raw).speakers, []);
+  });
+
+  test('normalizeSession: unknown day passes through', () => {
+    const raw = { guid: 'x', Type: '', Title: '', Description: '', Day: 'Monday', Time: 'TBD', Location: '' };
+    assertEqual(normalizeSession(raw).dayLabel, 'Monday');
+  });
+
+  test('parseHour: 9:00 AM → 9', () => {
+    assertEqual(parseHour('9:00 AM'), 9);
+  });
+
+  test('parseHour: 1:30 PM → 13', () => {
+    assertEqual(parseHour('1:30 PM'), 13);
+  });
+
+  test('parseHour: 12:00 PM → 12', () => {
+    assertEqual(parseHour('12:00 PM'), 12);
+  });
+
+  test('parseHour: 12:00 AM → 0', () => {
+    assertEqual(parseHour('12:00 AM'), 0);
+  });
+
+  test('parseHour: TBD → null', () => {
+    assertEqual(parseHour('TBD'), null);
+  });
+
+  test('parseHour: null → null', () => {
+    assertEqual(parseHour(null), null);
+  });
+
+  test('getSessionTypes: deduplicates and sorts', () => {
+    const sessions = [
+      { type: 'Workshop' }, { type: 'Plenary' }, { type: 'Workshop' }
+    ];
+    assertEqual(getSessionTypes(sessions), ['Plenary', 'Workshop']);
+  });
+
   return results();
 }
