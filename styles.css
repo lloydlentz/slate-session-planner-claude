@@ -208,6 +208,27 @@ a { color: inherit; text-decoration: none; }
   overflow: hidden;
 }
 
+.card-description-wrapper { position: relative; }
+
+.card-description.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.desc-expand-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 0;
+  display: block;
+  margin-top: 2px;
+}
+
+.desc-expand-btn:hover { text-decoration: underline; }
+
 .card-footer {
   display: flex;
   align-items: center;

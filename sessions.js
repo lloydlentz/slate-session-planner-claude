@@ -92,6 +92,16 @@ export function renderSessions(container, sessions, filters, onStatusChange) {
       toggle.classList.toggle('has-note', ta.value.trim().length > 0);
     });
   });
+
+  // Attach description expand handlers
+  container.querySelectorAll('.desc-expand-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const descEl = btn.previousElementSibling;
+      const isExpanded = descEl.classList.contains('expanded');
+      descEl.classList.toggle('expanded', !isExpanded);
+      btn.textContent = isExpanded ? 'Show more' : 'Show less';
+    });
+  });
 }
 
 function renderCard(session, team, preferences, typeColorMap) {
@@ -107,7 +117,7 @@ function renderCard(session, team, preferences, typeColorMap) {
   const pillsHtml = team.length > 0
     ? team.map(m => {
         const status = sessionPrefs[m] ?? 'none';
-        return `<button class="team-pill" data-session="${escHtml(session.id)}" data-member="${escHtml(m)}" data-status="${status}">${pillLabel(m, status)}</button>`;
+        return `<button class="team-pill" data-session="${escHtml(session.id)}" data-member="${escHtml(m)}" data-status="${escHtml(status)}">${pillLabel(m, status)}</button>`;
       }).join('')
     : '<span style="font-size:11px;color:var(--text-muted)">Add team members in Settings</span>';
 
@@ -120,10 +130,14 @@ function renderCard(session, team, preferences, typeColorMap) {
         </div>
         <div class="card-badges">
           <span class="badge badge-day">${escHtml(session.dayLabel)}</span>
-          <span class="badge badge-type badge-type-${colorIdx}">${escHtml(session.time)}</span>
+          <span class="badge badge-type badge-type-${colorIdx}">${escHtml(session.type)}</span>
         </div>
       </div>
-      ${session.description ? `<div class="card-description">${escHtml(session.description)}</div>` : ''}
+      ${session.description ? `
+  <div class="card-description-wrapper">
+    <div class="card-description">${escHtml(session.description)}</div>
+    ${session.description.length > 120 ? `<button class="desc-expand-btn" aria-label="Show more">Show more</button>` : ''}
+  </div>` : ''}
       <div class="card-footer">
         ${pillsHtml}
         <button class="note-toggle ${hasNote ? 'has-note' : ''}" data-session="${escHtml(session.id)}" title="Notes">💬</button>
