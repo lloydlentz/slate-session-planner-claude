@@ -15,7 +15,8 @@ function defaultState() {
 
 export function getState() {
   try {
-    return JSON.parse(localStorage.getItem(KEY)) || defaultState();
+    const raw = localStorage.getItem(KEY);
+    return raw ? JSON.parse(raw) : defaultState();
   } catch {
     return defaultState();
   }
