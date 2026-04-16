@@ -2,6 +2,7 @@
 import { getState, setState } from './state.js';
 import { getSessionTypes } from './data.js';
 import { renderSettings } from './settings.js';
+import { renderSchedule } from './schedule.js';
 import { renderSessions } from './sessions.js';
 
 const views = {
@@ -49,7 +50,8 @@ function renderSessionsView() {
 }
 
 function renderScheduleView() {
-  views.schedule.innerHTML = `<p style="color:var(--text-muted);padding:20px">Schedule view coming soon…</p>`;
+  const memberFilter = getActiveFilter('filter-member');
+  renderSchedule(views.schedule, allSessions, memberFilter);
 }
 
 function renderSettingsView() {
