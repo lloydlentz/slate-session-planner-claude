@@ -39,9 +39,9 @@ On fetch, `data.js` inspects the session objects for date/time fields (e.g., `da
 
 - If date/time fields exist → parse and use them directly.
 - If a `day` or numeric day field exists → map to the conference dates:
-  - Day 1 → Wednesday, June 25, 2026
-  - Day 2 → Thursday, June 26, 2026
-  - Day 3 → Friday, June 27, 2026
+  - Day 1 → Wednesday, June 24, 2026
+  - Day 2 → Thursday, June 25, 2026
+  - Day 3 → Friday, June 26, 2026
 - If no day field exists → distribute sessions across the 3 days by their position in the feed (first third to Wed, second third to Thu, remainder to Fri) as a best-effort fallback until the feed includes real dates.
 - If no time data is available, show time as "TBD" and list those sessions in a "Time TBD" section below the schedule grid rather than placing them in a time slot.
 
@@ -116,7 +116,7 @@ Filters compose (AND logic): a session appears if it matches ALL active filters.
 
 A time-grid calendar (Google Calendar style).
 
-- **Columns:** Wed 6/25 · Thu 6/26 · Fri 6/27
+- **Columns:** Wed 6/24 · Thu 6/25 · Fri 6/26
 - **Rows:** Hourly time slots (8:00am – 6:00pm)
 - **Session blocks:** Appear in the correct time slot, spanning their column
   - Show: session title + attendee initials (only members marked "going")
