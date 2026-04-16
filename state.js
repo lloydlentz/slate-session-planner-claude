@@ -5,7 +5,7 @@ const DEFAULT_ENDPOINT = 'https://slate-partners.technolutions.net/manage/query/
 
 function defaultState() {
   return {
-    team: [],
+    team: ['Lloyd', 'Kathryn', 'Austin'],
     endpoint: DEFAULT_ENDPOINT,
     sessionsCache: null,
     sessionsCachedAt: null,
