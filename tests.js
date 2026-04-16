@@ -31,7 +31,24 @@ function suite() {
 export async function runTests() {
   const { test, assertEqual, assert, results } = suite();
 
-  // Tests will be added in subsequent tasks
+  // --- state.js tests ---
+  const { cycleStatus } = await import('./state.js');
+
+  test('cycleStatus: none → interested', () => {
+    assertEqual(cycleStatus('none'), 'interested');
+  });
+
+  test('cycleStatus: interested → going', () => {
+    assertEqual(cycleStatus('interested'), 'going');
+  });
+
+  test('cycleStatus: going → none', () => {
+    assertEqual(cycleStatus('going'), 'none');
+  });
+
+  test('cycleStatus: unknown falls back to none', () => {
+    assertEqual(cycleStatus('bogus'), 'none');
+  });
 
   return results();
 }
