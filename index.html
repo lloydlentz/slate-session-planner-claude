@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conference Session Planner</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header id="top-bar">
+    <div id="brand">Conference Planner</div>
+    <nav id="main-nav">
+      <a href="#" class="nav-link active" data-view="sessions">Sessions</a>
+      <a href="#" class="nav-link" data-view="schedule">Schedule</a>
+      <a href="#" class="nav-link" data-view="settings">⚙ Settings</a>
+    </nav>
+  </header>
+
+  <div id="filter-strip" class="hidden">
+    <div class="filter-group">
+      <label>Day</label>
+      <div id="filter-day" class="filter-pills">
+        <button class="pill active" data-value="All">All</button>
+        <button class="pill" data-value="Wednesday">Wed</button>
+        <button class="pill" data-value="Thursday">Thu</button>
+        <button class="pill" data-value="Friday">Fri</button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <label>Type</label>
+      <div id="filter-type" class="filter-pills"></div>
+    </div>
+    <div class="filter-group">
+      <label>Member</label>
+      <div id="filter-member" class="filter-pills">
+        <button class="pill active" data-value="All">All</button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <label>Status</label>
+      <div id="filter-status" class="filter-pills">
+        <button class="pill active" data-value="All">All</button>
+        <button class="pill" data-value="interested">Interested</button>
+        <button class="pill" data-value="going">Going</button>
+      </div>
+    </div>
+  </div>
+
+  <main id="main-content">
+    <div id="view-sessions" class="view"></div>
+    <div id="view-schedule" class="view hidden"></div>
+    <div id="view-settings" class="view hidden"></div>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

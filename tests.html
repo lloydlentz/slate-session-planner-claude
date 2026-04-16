@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tests</title>
+  <style>
+    body { font-family: monospace; background: #0f172a; color: #e2e8f0; padding: 20px; }
+    .pass { color: #4ade80; }
+    .fail { color: #f87171; }
+    #summary { margin-top: 16px; font-size: 1.2em; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Test Runner</h2>
+  <div id="output"></div>
+  <div id="summary"></div>
+  <script type="module">
+    import { runTests } from './tests.js';
+    const results = await runTests();
+    const out = document.getElementById('output');
+    results.results.forEach(r => {
+      const el = document.createElement('div');
+      el.className = r.passed ? 'pass' : 'fail';
+      el.textContent = `${r.passed ? '✓' : '✗'} ${r.name}${r.error ? ': ' + r.error : ''}`;
+      out.appendChild(el);
+    });
+    document.getElementById('summary').textContent =
+      `${results.passed} passed, ${results.failed} failed`;
+  </script>
+</body>
+</html>
