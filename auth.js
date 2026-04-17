@@ -1,25 +1,14 @@
-// auth.js — Optional Supabase client for team sharing + magic link + display name
-// Login is only required if user wants to share/sync their plan with a team.
-// Local plan building works without authentication.
+// auth.js — Supabase client for team sharing + magic link + display name
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-let supabase = null;
-let configuredUrl = null;
+const SUPABASE_URL = 'https://pbxatpcrodtgjteicemd.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBieGF0cGNyb2R0Z2p0ZWljZW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzODgyMDAsImV4cCI6MjA5MTk2NDIwMH0.MvUZ-o7vqX5UIZX7RoLx31nC5OtmGqv79B-YNnEpFdA';
 
-/**
- * Initialize Supabase client with provided credentials (optional).
- * Only required if user wants to share/sync their plan with a team.
- * The client automatically handles magic link token in URL hash on init.
- * Re-initializes if the URL has changed (e.g. user updates credentials).
- * @param {string} url - Supabase project URL
- * @param {string} anonKey - Supabase anonymous key
- * @returns {object} Supabase client instance
- */
-export function initSupabase(url, anonKey) {
-  if (!url || !anonKey) throw new Error('auth.js: url and anonKey are required');
-  if (supabase && configuredUrl === url) return supabase;  // same URL, reuse
-  supabase = createClient(url, anonKey);
-  configuredUrl = url;
+let supabase = null;
+
+export function initSupabase() {
+  if (supabase) return supabase;
+  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   return supabase;
 }
 

@@ -13,8 +13,6 @@ function defaultState() {
     sessionsCache: null,
     sessionsCachedAt: null,
     preferences: {},
-    supabaseUrl: '',     // Supabase project URL
-    supabaseAnonKey: '', // Supabase anon key
     teamCode: '',        // e.g. "SLATE-4X9K" — shared with teammates
     myName: ''           // e.g. "Lloyd" — confirmed on first login
   };

@@ -92,8 +92,7 @@ function renderSessionsView() {
   if (fetchInProgress) return;
   renderSessions(views.sessions, allSessions, getActiveFilters(), (sessionId, member, newStatus) => {
     const s = getState();
-    // Only require auth if Supabase is configured
-    if (s.supabaseUrl && (!s.myName || !s.teamCode)) {
+    if (!s.myName || !s.teamCode) {
       pendingAction = { sessionId, member, newStatus };
       showSetupModal();
       return;
@@ -119,16 +118,6 @@ function renderSettingsView() {
       allSessions = sessions;
       rebuildPillGroup('filter-type', getSessionTypes(sessions));
       renderSessionsView();
-    },
-    onSupabaseSaved: (url, key) => {
-      try {
-        initSupabase(url, key);
-        updateSyncDot('configured');
-        if (unsubscribeAuth) { unsubscribeAuth(); unsubscribeAuth = null; }
-        unsubscribeAuth = onAuthStateChange(handleAuthStateChange);
-      } catch (err) {
-        console.error('Supabase init failed:', err);
-      }
     },
     onTeamCodeChanged: (code) => {
       setState({ teamCode: code ?? '' });
@@ -187,7 +176,7 @@ document.querySelectorAll('.nav-link').forEach(a => {
 
 async function initSyncIfReady() {
   const s = getState();
-  if (!s.supabaseUrl || !s.supabaseAnonKey || !s.teamCode || !s.myName || !isAuthenticated) return;
+  if (!s.teamCode || !s.myName || !isAuthenticated) return;
   if (syncInitInProgress) return;
   syncInitInProgress = true;
   if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
@@ -363,24 +352,20 @@ async function handleAuthStateChange(event, session) {
 (async () => {
   const state = getState();
 
-  // Init Supabase if credentials are configured
-  if (state.supabaseUrl && state.supabaseAnonKey) {
-    updateSyncDot('configured');
-    initSupabase(state.supabaseUrl, state.supabaseAnonKey);
-    // Register auth state change handler now that Supabase client exists
-    unsubscribeAuth = onAuthStateChange(handleAuthStateChange);
-    // Also check current session immediately
-    const result = await getSession();
-    const data = result?.data;
-    if (data?.session) {
-      isAuthenticated = true;
-      const displayName = data.session.user?.user_metadata?.display_name;
-      if (displayName && !getState().myName) {
-        setState({ myName: displayName });
-      }
-      if (getState().teamCode) {
-        await initSyncIfReady();
-      }
+  // Always init Supabase (credentials are hardcoded in auth.js)
+  updateSyncDot('configured');
+  initSupabase();
+  unsubscribeAuth = onAuthStateChange(handleAuthStateChange);
+  const result = await getSession();
+  const data = result?.data;
+  if (data?.session) {
+    isAuthenticated = true;
+    const displayName = data.session.user?.user_metadata?.display_name;
+    if (displayName && !getState().myName) {
+      setState({ myName: displayName });
+    }
+    if (getState().teamCode) {
+      await initSyncIfReady();
     }
   }
 

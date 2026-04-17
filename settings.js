@@ -3,7 +3,7 @@ import { getState, setState, exportData } from './state.js';
 import { fetchSessions } from './data.js';
 import { setDisplayName } from './auth.js';
 
-export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onSupabaseSaved, onTeamCodeChanged, onSignOut, currentUser }) {
+export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTeamCodeChanged, onSignOut, currentUser }) {
   const state = getState();
 
   container.innerHTML = `
@@ -59,28 +59,6 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onSup
         </div>
       </div>
 
-      <div class="settings-section" id="section-sync">
-        <div class="settings-section-header">
-          <h3>Sync & Collaboration</h3>
-          <span class="toggle">${state.supabaseUrl ? '▶' : '▼'}</span>
-        </div>
-        <div class="settings-section-body ${state.supabaseUrl ? 'hidden' : ''}">
-          <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:6px">
-            <label class="settings-label" for="supabase-url-input">Supabase Project URL</label>
-            <input class="settings-input" id="supabase-url-input" type="url" value="${escHtml(state.supabaseUrl)}" placeholder="https://xxxx.supabase.co" />
-          </div>
-          <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:6px">
-            <label class="settings-label" for="supabase-key-input">Anon Key</label>
-            <input class="settings-input" id="supabase-key-input" type="password" value="${escHtml(state.supabaseAnonKey)}" placeholder="eyJ..." />
-          </div>
-          <div class="settings-row">
-            <button class="btn" id="save-supabase-btn">Save & Connect</button>
-          </div>
-          <p class="settings-meta" id="supabase-status">${state.supabaseUrl ? '✓ Configured' : 'Enter your Supabase project URL and anon key from the Supabase dashboard.'}</p>
-        </div>
-      </div>
-
-      ${state.supabaseUrl ? `
       <div class="settings-section" id="section-team-code">
         <div class="settings-section-header">
           <h3>Your Team</h3>
@@ -107,7 +85,6 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onSup
           `}
         </div>
       </div>
-      ` : ''}
 
       ${currentUser ? `
       <div class="settings-section" id="section-account">
