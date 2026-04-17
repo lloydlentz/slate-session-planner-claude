@@ -4,6 +4,9 @@ import { getSessionTypes, fetchSessions } from './data.js';
 import { renderSettings } from './settings.js';
 import { renderSchedule } from './schedule.js';
 import { renderSessions } from './sessions.js';
+import { initSupabase, sendMagicLink, getSession, onAuthStateChange, getDisplayName, setDisplayName, signOut, getClient } from './auth.js';
+import { initSync, fetchAllPreferences, fetchAllNotes, pushPreference, pushNote, subscribeToChanges } from './sync.js';
+import { setPreference, setSyncHandlers, loadRemoteState } from './state.js';
 
 const views = {
   sessions: document.getElementById('view-sessions'),
@@ -16,6 +19,10 @@ const filterStrip = document.getElementById('filter-strip');
 let allSessions = [];
 let activeView = 'sessions';
 let fetchInProgress = false;
+
+let pendingAction = null;    // { sessionId, member, newStatus } waiting for auth
+let isAuthenticated = false; // tracks current auth state
+let unsubscribeSync = null;  // cleanup fn for realtime subscription
 
 function showView(name) {
   // Remove any lingering tooltip
@@ -44,9 +51,51 @@ function getActiveFilters() {
   };
 }
 
+function updateSyncDot(mode) { // 'hidden' | 'configured' | 'connected'
+  const dot = document.getElementById('sync-dot');
+  if (mode === 'hidden') {
+    dot.className = 'sync-dot hidden';
+  } else if (mode === 'connected') {
+    dot.className = 'sync-dot connected';
+    dot.title = 'Syncing with team';
+  } else {
+    dot.className = 'sync-dot configured';
+    dot.title = 'Sign in to sync';
+  }
+}
+
+function showSetupModal(step) {
+  // Determine which step to show if not specified
+  if (!step) {
+    if (!isAuthenticated) step = 'email';
+    else if (!getState().myName) step = 'name';
+    else step = 'team';
+  }
+  const modal = document.getElementById('setup-modal');
+  modal.querySelectorAll('.setup-step').forEach(s => s.classList.add('hidden'));
+  const stepEl = modal.querySelector(`.setup-step[data-step="${step}"]`);
+  if (stepEl) stepEl.classList.remove('hidden');
+  modal.classList.remove('hidden');
+  modal.focus();
+}
+
+function hideSetupModal() {
+  document.getElementById('setup-modal').classList.add('hidden');
+  pendingAction = null;
+}
+
 function renderSessionsView() {
   if (fetchInProgress) return;
-  renderSessions(views.sessions, allSessions, getActiveFilters(), () => {
+  renderSessions(views.sessions, allSessions, getActiveFilters(), (sessionId, member, newStatus) => {
+    const s = getState();
+    // Only require auth if Supabase is configured
+    if (s.supabaseUrl && (!s.myName || !s.teamCode)) {
+      pendingAction = { sessionId, member, newStatus };
+      showSetupModal();
+      return;
+    }
+    setPreference(sessionId, member, newStatus);
+    renderSessionsView();
     if (activeView === 'schedule') renderScheduleView();
   });
 }
@@ -105,36 +154,204 @@ document.querySelectorAll('.nav-link').forEach(a => {
   a.addEventListener('click', e => { e.preventDefault(); showView(a.dataset.view); });
 });
 
-// Init: restore from cache or show placeholder
-const state = getState();
-if (state.sessionsCache) {
-  allSessions = state.sessionsCache;
-  rebuildPillGroup('filter-type', getSessionTypes(allSessions));
-  if (state.team.length > 0) {
-    rebuildPillGroup('filter-member', state.team);
+async function initSyncIfReady() {
+  const s = getState();
+  if (!s.supabaseUrl || !s.supabaseAnonKey || !s.teamCode || !s.myName || !isAuthenticated) return;
+  if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
+  try {
+    initSync(getClient(), s.teamCode);
+    const [prefRows, noteRows] = await Promise.all([fetchAllPreferences(), fetchAllNotes()]);
+    loadRemoteState(prefRows, noteRows);
+    setSyncHandlers({ pushPreference, pushNote });
+    unsubscribeSync = subscribeToChanges(onRemotePreferenceChange, onRemoteNoteChange);
+    updateSyncDot('connected');
+    renderSessionsView();
+    if (activeView === 'schedule') renderScheduleView();
+  } catch (err) {
+    console.error('Sync init failed:', err);
+    updateSyncDot('configured');
   }
-  showView('sessions');
-} else {
-  // No cache — auto-fetch on first visit
-  fetchInProgress = true;
-  showView('sessions'); // renderSessionsView skips due to fetchInProgress flag
-  views.sessions.innerHTML = `<div class="loading">Loading sessions…</div>`;
-  fetchSessions(state.endpoint)
-    .then(sessions => {
-      fetchInProgress = false;
-      setState(s => ({ ...s, sessionsCache: sessions, sessionsCachedAt: Date.now() }));
-      allSessions = sessions;
-      rebuildPillGroup('filter-type', getSessionTypes(sessions));
-      const currentTeam = getState().team;
-      if (currentTeam.length > 0) {
-        rebuildPillGroup('filter-member', currentTeam);
-      }
-      renderSessionsView();
-    })
-    .catch(err => {
-      fetchInProgress = false;
-      views.sessions.innerHTML = `
-        <div class="error-msg">Failed to load sessions: ${err.message}</div>
-        <div class="empty-state"><h3>Could not load sessions</h3><p>Go to ⚙ Settings to configure the data endpoint and try again.</p></div>`;
-    });
 }
+
+function onRemotePreferenceChange(row) {
+  loadRemoteState([row], []);
+  if (activeView === 'sessions') renderSessionsView();
+  if (activeView === 'schedule') renderScheduleView();
+}
+
+function onRemoteNoteChange(row) {
+  loadRemoteState([], [row]);
+  if (activeView === 'sessions') renderSessionsView();
+}
+
+async function completeSetup() {
+  hideSetupModal();
+  await initSyncIfReady();
+  if (pendingAction) {
+    const { sessionId, member, newStatus } = pendingAction;
+    pendingAction = null;
+    setPreference(sessionId, member, newStatus);
+    renderSessionsView();
+    if (activeView === 'schedule') renderScheduleView();
+  }
+}
+
+// Modal button handlers
+// Backdrop click
+document.getElementById('setup-modal').addEventListener('click', e => {
+  if (e.target.id === 'setup-modal') hideSetupModal();
+});
+
+// Cancel (email step)
+document.getElementById('setup-cancel-btn').addEventListener('click', hideSetupModal);
+
+// Cancel (sent step)
+document.getElementById('setup-cancel-from-sent-btn').addEventListener('click', hideSetupModal);
+
+// Send magic link
+document.getElementById('setup-send-btn').addEventListener('click', async () => {
+  const email = document.getElementById('setup-email-input').value.trim();
+  if (!email) return;
+  const btn = document.getElementById('setup-send-btn');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  const { error } = await sendMagicLink(email);
+  btn.disabled = false;
+  btn.textContent = 'Send sign-in link';
+  if (error) { alert(`Could not send link: ${error}`); return; }
+  document.getElementById('setup-sent-email').textContent = email;
+  showSetupModal('sent');
+});
+
+// Set display name
+document.getElementById('setup-name-btn').addEventListener('click', async () => {
+  const name = document.getElementById('setup-name-input').value.trim();
+  if (!name) return;
+  const btn = document.getElementById('setup-name-btn');
+  btn.disabled = true;
+  const { error } = await setDisplayName(name);
+  btn.disabled = false;
+  if (error) { alert(`Could not save name: ${error}`); return; }
+  setState({ myName: name });
+  showSetupModal('team');
+});
+
+// Join team
+document.getElementById('setup-join-btn').addEventListener('click', async () => {
+  const code = document.getElementById('setup-team-code-input').value.trim().toUpperCase();
+  if (!code) return;
+  setState({ teamCode: code });
+  await completeSetup();
+});
+
+// Create new team
+document.getElementById('setup-create-btn').addEventListener('click', async () => {
+  const code = 'SLATE-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+  setState({ teamCode: code });
+  document.getElementById('setup-team-code-display').textContent = code;
+  showSetupModal('team-created');
+  // Don't completeSetup yet — user still needs to click Done
+  initSyncIfReady(); // fire-and-forget
+});
+
+// Copy team code
+document.getElementById('setup-copy-code-btn').addEventListener('click', () => {
+  const code = document.getElementById('setup-team-code-display').textContent;
+  navigator.clipboard.writeText(code).catch(() => {});
+  document.getElementById('setup-copy-code-btn').textContent = 'Copied!';
+  setTimeout(() => { document.getElementById('setup-copy-code-btn').textContent = 'Copy code'; }, 2000);
+});
+
+// Done (team-created step)
+document.getElementById('setup-done-btn').addEventListener('click', completeSetup);
+
+// Auth state change callback (registered after initSupabase in the init block)
+async function handleAuthStateChange(event, session) {
+  isAuthenticated = !!session;
+  if (!session) {
+    // User signed out
+    setSyncHandlers(null);
+    if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
+    setState({ myName: '' });
+    updateSyncDot('configured');
+    return;
+  }
+  // User signed in — read display name from session metadata
+  const displayName = session.user?.user_metadata?.display_name;
+  if (displayName && !getState().myName) {
+    setState({ myName: displayName });
+  }
+  // Advance modal if it's open
+  const modal = document.getElementById('setup-modal');
+  if (!modal.classList.contains('hidden')) {
+    const st = getState();
+    if (!st.myName) {
+      // Pre-fill name input with email prefix
+      const nameInput = document.getElementById('setup-name-input');
+      if (!nameInput.value && session.user?.email) {
+        nameInput.value = session.user.email.split('@')[0];
+      }
+      showSetupModal('name');
+    } else if (!st.teamCode) {
+      showSetupModal('team');
+    } else {
+      await completeSetup();
+    }
+  }
+  await initSyncIfReady();
+}
+
+// Init
+(async () => {
+  const state = getState();
+
+  // Init Supabase if credentials are configured
+  if (state.supabaseUrl && state.supabaseAnonKey) {
+    updateSyncDot('configured');
+    initSupabase(state.supabaseUrl, state.supabaseAnonKey);
+    // Register auth state change handler now that Supabase client exists
+    onAuthStateChange(handleAuthStateChange);
+    // Also check current session immediately
+    const result = await getSession();
+    const data = result?.data;
+    if (data?.session) {
+      isAuthenticated = true;
+      const displayName = data.session.user?.user_metadata?.display_name;
+      if (displayName && !getState().myName) {
+        setState({ myName: displayName });
+      }
+      if (getState().teamCode) {
+        await initSyncIfReady();
+      }
+    }
+  }
+
+  // Restore sessions from cache or fetch
+  const currentState = getState();
+  if (currentState.sessionsCache) {
+    allSessions = currentState.sessionsCache;
+    rebuildPillGroup('filter-type', getSessionTypes(allSessions));
+    if (currentState.team.length > 0) rebuildPillGroup('filter-member', currentState.team);
+    showView('sessions');
+  } else {
+    fetchInProgress = true;
+    showView('sessions');
+    views.sessions.innerHTML = `<div class="loading">Loading sessions…</div>`;
+    fetchSessions(currentState.endpoint)
+      .then(sessions => {
+        fetchInProgress = false;
+        setState(s => ({ ...s, sessionsCache: sessions, sessionsCachedAt: Date.now() }));
+        allSessions = sessions;
+        rebuildPillGroup('filter-type', getSessionTypes(sessions));
+        const currentTeam = getState().team;
+        if (currentTeam.length > 0) rebuildPillGroup('filter-member', currentTeam);
+        renderSessionsView();
+      })
+      .catch(err => {
+        fetchInProgress = false;
+        views.sessions.innerHTML = `
+          <div class="error-msg">Failed to load sessions: ${err.message}</div>
+          <div class="empty-state"><h3>Could not load sessions</h3><p>Go to ⚙ Settings to configure the data endpoint and try again.</p></div>`;
+      });
+  }
+})();

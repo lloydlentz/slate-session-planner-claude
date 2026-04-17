@@ -1,5 +1,5 @@
 // Sessions view
-import { getState, setPreference, setNote, cycleStatus } from './state.js';
+import { getState, setNote, cycleStatus } from './state.js';
 import { getSessionTypes } from './data.js';
 
 export function filterSessions(sessions, filters, preferences, team) {
@@ -68,10 +68,8 @@ export function renderSessions(container, sessions, filters, onStatusChange) {
       const member = pill.dataset.member;
       const current = pill.dataset.status;
       const next = cycleStatus(current);
-      setPreference(sessionId, member, next);
-      pill.dataset.status = next;
-      pill.textContent = pillLabel(member, next);
-      onStatusChange();
+      onStatusChange(sessionId, member, next);
+      // DOM update handled by full re-render in app.js callback
     });
   });
 
