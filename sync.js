@@ -164,43 +164,23 @@ export function subscribeToChanges(onPreferenceChange, onNoteChange) {
     .channel(`team-changes-${currentTeamCode}`)
     .on(
       'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'member_preferences',
-        filter: `team_code=eq.${currentTeamCode}`
-      },
-      (payload) => onPreferenceChange(payload.new)
+      { event: 'INSERT', schema: 'public', table: 'member_preferences' },
+      (payload) => { if (payload.new.team_code === currentTeamCode) onPreferenceChange(payload.new); }
     )
     .on(
       'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'member_preferences',
-        filter: `team_code=eq.${currentTeamCode}`
-      },
-      (payload) => onPreferenceChange(payload.new)
+      { event: 'UPDATE', schema: 'public', table: 'member_preferences' },
+      (payload) => { if (payload.new.team_code === currentTeamCode) onPreferenceChange(payload.new); }
     )
     .on(
       'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'session_notes',
-        filter: `team_code=eq.${currentTeamCode}`
-      },
-      (payload) => onNoteChange(payload.new)
+      { event: 'INSERT', schema: 'public', table: 'session_notes' },
+      (payload) => { if (payload.new.team_code === currentTeamCode) onNoteChange(payload.new); }
     )
     .on(
       'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'session_notes',
-        filter: `team_code=eq.${currentTeamCode}`
-      },
-      (payload) => onNoteChange(payload.new)
+      { event: 'UPDATE', schema: 'public', table: 'session_notes' },
+      (payload) => { if (payload.new.team_code === currentTeamCode) onNoteChange(payload.new); }
     )
     .subscribe();
 
