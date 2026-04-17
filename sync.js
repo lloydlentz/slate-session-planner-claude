@@ -2,6 +2,7 @@
 
 let client = null;
 let currentTeamCode = null;
+let activeChannel = null;
 
 /**
  * Initialize sync with Supabase client and team code.
@@ -9,8 +10,17 @@ let currentTeamCode = null;
  * @param {string} teamCode - Team code to filter all queries
  */
 export function initSync(supabaseClient, teamCode) {
+  if (!supabaseClient) throw new Error('sync.js: supabaseClient is required');
+  if (!teamCode?.trim()) throw new Error('sync.js: teamCode is required');
+
+  // Clean up existing channel if re-initializing
+  if (activeChannel && client) {
+    client.removeChannel(activeChannel);
+    activeChannel = null;
+  }
+
   client = supabaseClient;
-  currentTeamCode = teamCode;
+  currentTeamCode = teamCode.trim();
 }
 
 /**
@@ -151,36 +161,52 @@ export function subscribeToChanges(onPreferenceChange, onNoteChange) {
   }
 
   const channel = client
-    .channel('team-changes')
+    .channel(`team-changes-${currentTeamCode}`)
     .on(
       'postgres_changes',
       {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
         table: 'member_preferences',
         filter: `team_code=eq.${currentTeamCode}`
       },
-      (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          onPreferenceChange(payload.new);
-        }
-      }
+      (payload) => onPreferenceChange(payload.new)
     )
     .on(
       'postgres_changes',
       {
-        event: '*',
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'member_preferences',
+        filter: `team_code=eq.${currentTeamCode}`
+      },
+      (payload) => onPreferenceChange(payload.new)
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
         schema: 'public',
         table: 'session_notes',
         filter: `team_code=eq.${currentTeamCode}`
       },
-      (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          onNoteChange(payload.new);
-        }
-      }
+      (payload) => onNoteChange(payload.new)
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'session_notes',
+        filter: `team_code=eq.${currentTeamCode}`
+      },
+      (payload) => onNoteChange(payload.new)
     )
     .subscribe();
 
-  return () => client.removeChannel(channel);
+  activeChannel = channel;
+  return () => {
+    client.removeChannel(channel);
+    activeChannel = null;
+  };
 }
