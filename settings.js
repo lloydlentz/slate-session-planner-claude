@@ -1,8 +1,9 @@
 // Settings panel
 import { getState, setState, exportData } from './state.js';
 import { fetchSessions } from './data.js';
+import { setDisplayName } from './auth.js';
 
-export function renderSettings(container, { onTeamSaved, onSessionsLoaded }) {
+export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onSupabaseSaved, onTeamCodeChanged, onSignOut, currentUser }) {
   const state = getState();
 
   container.innerHTML = `
@@ -57,6 +58,76 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded }) {
           <p class="settings-meta">Downloads your team settings and all session preferences as a JSON file.</p>
         </div>
       </div>
+
+      <div class="settings-section" id="section-sync">
+        <div class="settings-section-header">
+          <h3>Sync & Collaboration</h3>
+          <span class="toggle">${state.supabaseUrl ? '▶' : '▼'}</span>
+        </div>
+        <div class="settings-section-body ${state.supabaseUrl ? 'hidden' : ''}">
+          <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+            <label class="settings-label" for="supabase-url-input">Supabase Project URL</label>
+            <input class="settings-input" id="supabase-url-input" type="url" value="${escHtml(state.supabaseUrl)}" placeholder="https://xxxx.supabase.co" />
+          </div>
+          <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+            <label class="settings-label" for="supabase-key-input">Anon Key</label>
+            <input class="settings-input" id="supabase-key-input" type="password" value="${escHtml(state.supabaseAnonKey)}" placeholder="eyJ..." />
+          </div>
+          <div class="settings-row">
+            <button class="btn" id="save-supabase-btn">Save & Connect</button>
+          </div>
+          <p class="settings-meta" id="supabase-status">${state.supabaseUrl ? '✓ Configured' : 'Enter your Supabase project URL and anon key from the Supabase dashboard.'}</p>
+        </div>
+      </div>
+
+      ${state.supabaseUrl ? `
+      <div class="settings-section" id="section-team-code">
+        <div class="settings-section-header">
+          <h3>Your Team</h3>
+          <span class="toggle">${state.teamCode ? '▶' : '▼'}</span>
+        </div>
+        <div class="settings-section-body ${state.teamCode ? 'hidden' : ''}">
+          ${state.teamCode ? `
+            <p class="settings-meta">Team code: <span class="team-code-display">${escHtml(state.teamCode)}</span></p>
+            <div class="settings-row">
+              <button class="btn btn-secondary" id="copy-team-code-btn">Copy code</button>
+              <button class="btn btn-danger" id="leave-team-btn">Leave team</button>
+            </div>
+          ` : `
+            <p class="settings-meta">Have a team code from a colleague?</p>
+            <div class="settings-row">
+              <input class="settings-input" id="join-code-input" type="text" placeholder="SLATE-XXXXX" />
+              <button class="btn" id="join-team-btn">Join team</button>
+            </div>
+            <p class="settings-meta">Or generate a new code to share with your team:</p>
+            <div class="settings-row">
+              <button class="btn btn-secondary" id="create-team-btn">Create new team</button>
+            </div>
+            <p class="settings-meta" id="team-code-status"></p>
+          `}
+        </div>
+      </div>
+      ` : ''}
+
+      ${currentUser ? `
+      <div class="settings-section" id="section-account">
+        <div class="settings-section-header">
+          <h3>Account</h3>
+          <span class="toggle">▶</span>
+        </div>
+        <div class="settings-section-body hidden">
+          <p class="settings-meta">Signed in as <strong>${escHtml(currentUser.email)}</strong>${currentUser.displayName ? ` · ${escHtml(currentUser.displayName)}` : ''}</p>
+          <div class="settings-row">
+            <input class="settings-input" id="display-name-input" type="text" value="${escHtml(currentUser.displayName ?? '')}" placeholder="Your display name" />
+            <button class="btn" id="save-name-btn">Update name</button>
+          </div>
+          <div class="settings-row">
+            <button class="btn btn-danger" id="sign-out-btn">Sign out</button>
+          </div>
+          <p class="settings-meta" id="account-status"></p>
+        </div>
+      </div>
+      ` : ''}
 
     </div>
   `;
@@ -148,6 +219,72 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded }) {
     a.download = 'conference-planner-data.json';
     a.click();
     URL.revokeObjectURL(url);
+  });
+
+  // --- Sync & Collaboration ---
+  container.querySelector('#save-supabase-btn')?.addEventListener('click', () => {
+    const url = container.querySelector('#supabase-url-input').value.trim();
+    const key = container.querySelector('#supabase-key-input').value.trim();
+    if (!url || !key) {
+      container.querySelector('#supabase-status').textContent = 'Please enter both URL and anon key.';
+      return;
+    }
+    setState(s => ({ ...s, supabaseUrl: url, supabaseAnonKey: key }));
+    container.querySelector('#supabase-status').textContent = '✓ Saved. Connecting…';
+    container.querySelector('#section-sync .settings-section-body').classList.add('hidden');
+    container.querySelector('#section-sync .toggle').textContent = '▶';
+    onSupabaseSaved(url, key);
+  });
+
+  // --- Your Team ---
+  container.querySelector('#join-team-btn')?.addEventListener('click', () => {
+    const code = container.querySelector('#join-code-input')?.value.trim().toUpperCase();
+    if (!code) return;
+    onTeamCodeChanged(code);
+  });
+
+  container.querySelector('#join-code-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') container.querySelector('#join-team-btn')?.click();
+  });
+
+  container.querySelector('#create-team-btn')?.addEventListener('click', () => {
+    const code = 'SLATE-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+    const status = container.querySelector('#team-code-status');
+    if (status) status.textContent = `Your code: ${code} — share this with your team!`;
+    onTeamCodeChanged(code);
+  });
+
+  container.querySelector('#copy-team-code-btn')?.addEventListener('click', () => {
+    const code = getState().teamCode;
+    navigator.clipboard.writeText(code).catch(() => {});
+    const btn = container.querySelector('#copy-team-code-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy code'; }, 2000);
+  });
+
+  container.querySelector('#leave-team-btn')?.addEventListener('click', () => {
+    onTeamCodeChanged(null);
+  });
+
+  // --- Account ---
+  container.querySelector('#save-name-btn')?.addEventListener('click', async () => {
+    const name = container.querySelector('#display-name-input')?.value.trim();
+    if (!name) return;
+    const btn = container.querySelector('#save-name-btn');
+    const status = container.querySelector('#account-status');
+    btn.disabled = true;
+    const { error } = await setDisplayName(name);
+    btn.disabled = false;
+    if (error) { status.textContent = `Error: ${error}`; return; }
+    setState({ myName: name });
+    status.textContent = '✓ Name updated';
+  });
+
+  container.querySelector('#sign-out-btn')?.addEventListener('click', async () => {
+    const btn = container.querySelector('#sign-out-btn');
+    btn.disabled = true;
+    await onSignOut();
+    btn.disabled = false;
   });
 }
 

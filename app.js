@@ -24,6 +24,7 @@ let pendingAction = null;       // { sessionId, member, newStatus } waiting for 
 let isAuthenticated = false;   // tracks current auth state
 let unsubscribeSync = null;    // cleanup fn for realtime subscription
 let syncInitInProgress = false;
+let currentUserEmail = '';
 
 function showView(name) {
   // Remove any lingering tooltip
@@ -117,7 +118,33 @@ function renderSettingsView() {
       allSessions = sessions;
       rebuildPillGroup('filter-type', getSessionTypes(sessions));
       renderSessionsView();
-    }
+    },
+    onSupabaseSaved: (url, key) => {
+      try {
+        initSupabase(url, key);
+        updateSyncDot('configured');
+        onAuthStateChange(handleAuthStateChange);
+      } catch (err) {
+        console.error('Supabase init failed:', err);
+      }
+    },
+    onTeamCodeChanged: (code) => {
+      setState({ teamCode: code ?? '' });
+      if (code) {
+        initSyncIfReady();
+      } else {
+        // Leaving team: tear down sync
+        setSyncHandlers(null);
+        if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
+        updateSyncDot('configured');
+      }
+      renderSettingsView(); // re-render to show updated team section
+    },
+    onSignOut: async () => {
+      await signOut();
+      // handleAuthStateChange will fire and handle cleanup
+    },
+    currentUser: isAuthenticated ? { email: currentUserEmail, displayName: getState().myName } : null,
   });
 }
 
@@ -294,6 +321,7 @@ async function handleAuthStateChange(event, session) {
   isAuthenticated = !!session;
   if (!session) {
     // User signed out
+    currentUserEmail = '';
     setSyncHandlers(null);
     pendingAction = null;
     if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
@@ -302,6 +330,7 @@ async function handleAuthStateChange(event, session) {
     return;
   }
   // User signed in — read display name from session metadata
+  currentUserEmail = session.user?.email ?? '';
   const displayName = session.user?.user_metadata?.display_name;
   if (displayName && !getState().myName) {
     setState({ myName: displayName });
