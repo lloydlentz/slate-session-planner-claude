@@ -868,3 +868,17 @@ body.light-mode .team-pill[data-status="going"] { color: #15803d; }
 
 .view-mode-btn:hover { color: var(--text); background: var(--bg-hover); }
 .view-mode-btn.active { background: var(--accent); color: #fff; }
+
+/* ===== Theme Toggle Button ===== */
+.theme-toggle-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  line-height: 1;
+  transition: background 0.15s;
+}
+
+.theme-toggle-btn:hover { background: var(--bg-card); }

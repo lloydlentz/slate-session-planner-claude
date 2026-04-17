@@ -48,6 +48,11 @@ function getActiveFilters() {
   };
 }
 
+function applyTheme(theme) {
+  document.body.classList.toggle('light-mode', theme === 'light');
+  document.getElementById('theme-toggle-btn').textContent = theme === 'light' ? '🌙' : '☀️';
+}
+
 function updateSyncDot(mode) { // 'hidden' | 'configured' | 'connected'
   const dot = document.getElementById('sync-dot');
   if (mode === 'hidden') {
@@ -100,7 +105,7 @@ function renderSettingsView() {
     },
     onThemeChange: (theme) => {
       setState(s => ({ ...s, theme }));
-      document.body.classList.toggle('light-mode', theme === 'light');
+      applyTheme(theme);
       renderSettingsView();
     },
   });
@@ -139,6 +144,15 @@ function escHtml(str) {
 // Nav
 document.querySelectorAll('.nav-link').forEach(a => {
   if (a.dataset.view) a.addEventListener('click', e => { e.preventDefault(); showView(a.dataset.view); });
+});
+
+// Theme toggle button in nav
+document.getElementById('theme-toggle-btn').addEventListener('click', () => {
+  const current = getState().theme ?? 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  setState(s => ({ ...s, theme: next }));
+  applyTheme(next);
+  if (activeView === 'settings') renderSettingsView();
 });
 
 // View mode toggle
@@ -206,7 +220,7 @@ function onRemoteTeamChange(members) {
 
   // Apply saved theme
   const savedTheme = getState().theme ?? 'dark';
-  document.body.classList.toggle('light-mode', savedTheme === 'light');
+  applyTheme(savedTheme);
 
   // Apply saved view mode to toggle buttons
   const savedView = getState().sessionView ?? 'tiles';
