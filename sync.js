@@ -166,11 +166,10 @@ export async function fetchTeamMembers() {
 
 export async function pushTeamMembers(members) {
   if (!client || !currentTeamCode) return;
-  await client.from('team_config').upsert({
-    team_code: currentTeamCode,
-    members,
-    updated_at: new Date().toISOString()
-  }).catch(() => {});
+  const { error } = await client
+    .from('team_config')
+    .upsert({ team_code: currentTeamCode, members, updated_at: new Date().toISOString() });
+  if (error) console.error('pushTeamMembers:', error);
 }
 
 export function subscribeToChanges(onPreferenceChange, onNoteChange, onTeamChange) {

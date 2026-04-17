@@ -80,7 +80,7 @@ function renderSettingsView() {
     onTeamSaved: (team) => {
       rebuildPillGroup('filter-member', team);
       if (activeView === 'sessions') renderSessionsView();
-      if (getState().teamCode) pushTeamMembers(team).catch(() => {});
+      if (getState().teamCode) pushTeamMembers(team);
     },
     onSessionsLoaded: (sessions) => {
       allSessions = sessions;
@@ -152,7 +152,7 @@ async function initSyncIfReady() {
       rebuildPillGroup('filter-member', remoteMembers);
     } else {
       // No team config in Supabase yet — push local members to establish the team
-      pushTeamMembers(getState().team).catch(() => {});
+      pushTeamMembers(getState().team);
     }
     setSyncHandlers({ pushPreference, pushNote });
     unsubscribeSync = subscribeToChanges(onRemotePreferenceChange, onRemoteNoteChange, onRemoteTeamChange);
