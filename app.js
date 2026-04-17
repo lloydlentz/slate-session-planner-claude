@@ -20,9 +20,10 @@ let allSessions = [];
 let activeView = 'sessions';
 let fetchInProgress = false;
 
-let pendingAction = null;    // { sessionId, member, newStatus } waiting for auth
-let isAuthenticated = false; // tracks current auth state
-let unsubscribeSync = null;  // cleanup fn for realtime subscription
+let pendingAction = null;       // { sessionId, member, newStatus } waiting for auth
+let isAuthenticated = false;   // tracks current auth state
+let unsubscribeSync = null;    // cleanup fn for realtime subscription
+let syncInitInProgress = false;
 
 function showView(name) {
   // Remove any lingering tooltip
@@ -76,7 +77,8 @@ function showSetupModal(step) {
   const stepEl = modal.querySelector(`.setup-step[data-step="${step}"]`);
   if (stepEl) stepEl.classList.remove('hidden');
   modal.classList.remove('hidden');
-  modal.focus();
+  const firstFocusable = modal.querySelector('input:not([disabled]), button:not([disabled])');
+  (firstFocusable ?? modal).focus();
 }
 
 function hideSetupModal() {
@@ -157,6 +159,8 @@ document.querySelectorAll('.nav-link').forEach(a => {
 async function initSyncIfReady() {
   const s = getState();
   if (!s.supabaseUrl || !s.supabaseAnonKey || !s.teamCode || !s.myName || !isAuthenticated) return;
+  if (syncInitInProgress) return;
+  syncInitInProgress = true;
   if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
   try {
     initSync(getClient(), s.teamCode);
@@ -165,11 +169,16 @@ async function initSyncIfReady() {
     setSyncHandlers({ pushPreference, pushNote });
     unsubscribeSync = subscribeToChanges(onRemotePreferenceChange, onRemoteNoteChange);
     updateSyncDot('connected');
-    renderSessionsView();
-    if (activeView === 'schedule') renderScheduleView();
+    // Only re-render if modal is not open
+    if (document.getElementById('setup-modal').classList.contains('hidden')) {
+      renderSessionsView();
+      if (activeView === 'schedule') renderScheduleView();
+    }
   } catch (err) {
     console.error('Sync init failed:', err);
     updateSyncDot('configured');
+  } finally {
+    syncInitInProgress = false;
   }
 }
 
@@ -265,12 +274,28 @@ document.getElementById('setup-copy-code-btn').addEventListener('click', () => {
 // Done (team-created step)
 document.getElementById('setup-done-btn').addEventListener('click', completeSetup);
 
+// Escape key dismisses modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !document.getElementById('setup-modal').classList.contains('hidden')) {
+    hideSetupModal();
+  }
+});
+
+// Enter key submits email / team-code inputs
+document.getElementById('setup-email-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('setup-send-btn').click();
+});
+document.getElementById('setup-team-code-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('setup-join-btn').click();
+});
+
 // Auth state change callback (registered after initSupabase in the init block)
 async function handleAuthStateChange(event, session) {
   isAuthenticated = !!session;
   if (!session) {
     // User signed out
     setSyncHandlers(null);
+    pendingAction = null;
     if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
     setState({ myName: '' });
     updateSyncDot('configured');
