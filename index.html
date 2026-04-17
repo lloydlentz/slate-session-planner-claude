@@ -54,7 +54,7 @@
     <div id="view-settings" class="view hidden"></div>
   </main>
 
-  <div id="setup-modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="setup-modal-title">
+  <div id="setup-modal" class="hidden" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="setup-modal-title">
     <div class="setup-card">
 
       <!-- Step: email -->
@@ -70,8 +70,9 @@
 
       <!-- Step: sent -->
       <div class="setup-step hidden" data-step="sent">
-        <h2 id="setup-modal-title">Check your email</h2>
+        <h2>Check your email</h2>
         <p class="setup-subtitle">We sent a sign-in link to <span id="setup-sent-email"></span>.<br>Click the link to continue.</p>
+        <button id="setup-cancel-from-sent-btn" class="btn-ghost" style="margin-top:12px">Cancel</button>
       </div>
 
       <!-- Step: name -->
@@ -88,7 +89,7 @@
         <h2>Join or create a team</h2>
         <p class="setup-subtitle">Have a team code from a colleague?</p>
         <div class="setup-row">
-          <input type="text" id="setup-team-code-input" class="setup-input" placeholder="e.g. SLATE-4X9K2" autocomplete="off" style="text-transform:uppercase">
+          <input type="text" id="setup-team-code-input" class="setup-input" placeholder="e.g. SLATE-4X9K2" autocomplete="off">
           <button id="setup-join-btn" class="btn-primary">Join team</button>
         </div>
         <p class="setup-divider">Or start a new team:</p>
