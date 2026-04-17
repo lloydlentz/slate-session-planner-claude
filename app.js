@@ -4,7 +4,7 @@ import { getSessionTypes, fetchSessions } from './data.js';
 import { renderSettings } from './settings.js';
 import { renderSchedule } from './schedule.js';
 import { renderSessions } from './sessions.js';
-import { initSupabase, sendMagicLink, getSession, onAuthStateChange, getDisplayName, setDisplayName, signOut, getClient } from './auth.js';
+import { initSupabase, getClient } from './auth.js';
 import { initSync, fetchAllPreferences, fetchAllNotes, pushPreference, pushNote, subscribeToChanges } from './sync.js';
 import { setPreference, setSyncHandlers, loadRemoteState } from './state.js';
 
@@ -19,16 +19,10 @@ const filterStrip = document.getElementById('filter-strip');
 let allSessions = [];
 let activeView = 'sessions';
 let fetchInProgress = false;
-
-let pendingAction = null;       // { sessionId, member, newStatus } waiting for auth
-let isAuthenticated = false;   // tracks current auth state
-let unsubscribeSync = null;    // cleanup fn for realtime subscription
-let unsubscribeAuth = null;    // cleanup fn for auth state listener
+let unsubscribeSync = null;
 let syncInitInProgress = false;
-let currentUserEmail = '';
 
 function showView(name) {
-  // Remove any lingering tooltip
   const oldTooltip = document.getElementById('schedule-tooltip');
   if (oldTooltip) oldTooltip.remove();
 
@@ -63,40 +57,13 @@ function updateSyncDot(mode) { // 'hidden' | 'configured' | 'connected'
     dot.title = 'Syncing with team';
   } else {
     dot.className = 'sync-dot configured';
-    dot.title = 'Sign in to sync';
+    dot.title = 'Connecting…';
   }
-}
-
-function showSetupModal(step) {
-  // Determine which step to show if not specified
-  if (!step) {
-    if (!isAuthenticated) step = 'email';
-    else if (!getState().myName) step = 'name';
-    else step = 'team';
-  }
-  const modal = document.getElementById('setup-modal');
-  modal.querySelectorAll('.setup-step').forEach(s => s.classList.add('hidden'));
-  const stepEl = modal.querySelector(`.setup-step[data-step="${step}"]`);
-  if (stepEl) stepEl.classList.remove('hidden');
-  modal.classList.remove('hidden');
-  const firstFocusable = modal.querySelector('input:not([disabled]), button:not([disabled])');
-  (firstFocusable ?? modal).focus();
-}
-
-function hideSetupModal() {
-  document.getElementById('setup-modal').classList.add('hidden');
-  pendingAction = null;
 }
 
 function renderSessionsView() {
   if (fetchInProgress) return;
   renderSessions(views.sessions, allSessions, getActiveFilters(), (sessionId, member, newStatus) => {
-    const s = getState();
-    if (!s.myName || !s.teamCode) {
-      pendingAction = { sessionId, member, newStatus };
-      showSetupModal();
-      return;
-    }
     setPreference(sessionId, member, newStatus);
     renderSessionsView();
     if (activeView === 'schedule') renderScheduleView();
@@ -124,18 +91,12 @@ function renderSettingsView() {
       if (code) {
         initSyncIfReady();
       } else {
-        // Leaving team: tear down sync
         setSyncHandlers(null);
         if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
-        updateSyncDot('configured');
+        updateSyncDot('hidden');
       }
-      renderSettingsView(); // re-render to show updated team section
+      renderSettingsView();
     },
-    onSignOut: async () => {
-      await signOut();
-      // handleAuthStateChange will fire and handle cleanup
-    },
-    currentUser: isAuthenticated ? { email: currentUserEmail, displayName: getState().myName } : null,
   });
 }
 
@@ -176,10 +137,11 @@ document.querySelectorAll('.nav-link').forEach(a => {
 
 async function initSyncIfReady() {
   const s = getState();
-  if (!s.teamCode || !s.myName || !isAuthenticated) return;
+  if (!s.teamCode) return;
   if (syncInitInProgress) return;
   syncInitInProgress = true;
   if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
+  updateSyncDot('configured');
   try {
     initSync(getClient(), s.teamCode);
     const [prefRows, noteRows] = await Promise.all([fetchAllPreferences(), fetchAllNotes()]);
@@ -187,11 +149,8 @@ async function initSyncIfReady() {
     setSyncHandlers({ pushPreference, pushNote });
     unsubscribeSync = subscribeToChanges(onRemotePreferenceChange, onRemoteNoteChange);
     updateSyncDot('connected');
-    // Only re-render if modal is not open
-    if (document.getElementById('setup-modal').classList.contains('hidden')) {
-      renderSessionsView();
-      if (activeView === 'schedule') renderScheduleView();
-    }
+    renderSessionsView();
+    if (activeView === 'schedule') renderScheduleView();
   } catch (err) {
     console.error('Sync init failed:', err);
     updateSyncDot('configured');
@@ -211,165 +170,15 @@ function onRemoteNoteChange(row) {
   if (activeView === 'sessions') renderSessionsView();
 }
 
-async function completeSetup() {
-  hideSetupModal();
-  await initSyncIfReady();
-  if (pendingAction) {
-    const { sessionId, member, newStatus } = pendingAction;
-    pendingAction = null;
-    setPreference(sessionId, member, newStatus);
-    renderSessionsView();
-    if (activeView === 'schedule') renderScheduleView();
-  }
-}
-
-// Modal button handlers
-// Backdrop click
-document.getElementById('setup-modal').addEventListener('click', e => {
-  if (e.target.id === 'setup-modal') hideSetupModal();
-});
-
-// Cancel (email step)
-document.getElementById('setup-cancel-btn').addEventListener('click', hideSetupModal);
-
-// Cancel (sent step)
-document.getElementById('setup-cancel-from-sent-btn').addEventListener('click', hideSetupModal);
-
-// Send magic link
-document.getElementById('setup-send-btn').addEventListener('click', async () => {
-  const email = document.getElementById('setup-email-input').value.trim();
-  if (!email) return;
-  const btn = document.getElementById('setup-send-btn');
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
-  const { error } = await sendMagicLink(email);
-  btn.disabled = false;
-  btn.textContent = 'Send sign-in link';
-  if (error) { alert(`Could not send link: ${error}`); return; }
-  document.getElementById('setup-sent-email').textContent = email;
-  showSetupModal('sent');
-});
-
-// Set display name
-document.getElementById('setup-name-btn').addEventListener('click', async () => {
-  const name = document.getElementById('setup-name-input').value.trim();
-  if (!name) return;
-  const btn = document.getElementById('setup-name-btn');
-  btn.disabled = true;
-  const { error } = await setDisplayName(name);
-  btn.disabled = false;
-  if (error) { alert(`Could not save name: ${error}`); return; }
-  setState({ myName: name });
-  showSetupModal('team');
-});
-
-// Join team
-document.getElementById('setup-join-btn').addEventListener('click', async () => {
-  const code = document.getElementById('setup-team-code-input').value.trim().toUpperCase();
-  if (!code) return;
-  setState({ teamCode: code });
-  await completeSetup();
-});
-
-// Create new team
-document.getElementById('setup-create-btn').addEventListener('click', async () => {
-  const code = 'SLATE-' + Math.random().toString(36).substring(2, 7).toUpperCase();
-  setState({ teamCode: code });
-  document.getElementById('setup-team-code-display').textContent = code;
-  showSetupModal('team-created');
-  // Don't completeSetup yet — user still needs to click Done
-  initSyncIfReady(); // fire-and-forget
-});
-
-// Copy team code
-document.getElementById('setup-copy-code-btn').addEventListener('click', () => {
-  const code = document.getElementById('setup-team-code-display').textContent;
-  navigator.clipboard.writeText(code).catch(() => {});
-  document.getElementById('setup-copy-code-btn').textContent = 'Copied!';
-  setTimeout(() => { document.getElementById('setup-copy-code-btn').textContent = 'Copy code'; }, 2000);
-});
-
-// Done (team-created step)
-document.getElementById('setup-done-btn').addEventListener('click', completeSetup);
-
-// Escape key dismisses modal
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !document.getElementById('setup-modal').classList.contains('hidden')) {
-    hideSetupModal();
-  }
-});
-
-// Enter key submits email / team-code inputs
-document.getElementById('setup-email-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('setup-send-btn').click();
-});
-document.getElementById('setup-team-code-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('setup-join-btn').click();
-});
-
-// Auth state change callback (registered after initSupabase in the init block)
-async function handleAuthStateChange(event, session) {
-  isAuthenticated = !!session;
-  if (!session) {
-    // User signed out
-    currentUserEmail = '';
-    setSyncHandlers(null);
-    pendingAction = null;
-    if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
-    setState({ myName: '' });
-    updateSyncDot('configured');
-    // Re-render settings if it's the active view, so Account section disappears
-    if (activeView === 'settings') renderSettingsView();
-    return;
-  }
-  // User signed in — read display name from session metadata
-  currentUserEmail = session.user?.email ?? '';
-  const displayName = session.user?.user_metadata?.display_name;
-  if (displayName && !getState().myName) {
-    setState({ myName: displayName });
-  }
-  // Advance modal if it's open
-  const modal = document.getElementById('setup-modal');
-  if (!modal.classList.contains('hidden')) {
-    const st = getState();
-    if (!st.myName) {
-      // Pre-fill name input with email prefix
-      const nameInput = document.getElementById('setup-name-input');
-      if (!nameInput.value && session.user?.email) {
-        nameInput.value = session.user.email.split('@')[0];
-      }
-      showSetupModal('name');
-    } else if (!st.teamCode) {
-      showSetupModal('team');
-    } else {
-      await completeSetup();
-    }
-  }
-  await initSyncIfReady();
-}
-
 // Init
 (async () => {
-  const state = getState();
-
-  // Always init Supabase (credentials are hardcoded in auth.js)
-  updateSyncDot('configured');
   initSupabase();
-  unsubscribeAuth = onAuthStateChange(handleAuthStateChange);
-  const result = await getSession();
-  const data = result?.data;
-  if (data?.session) {
-    isAuthenticated = true;
-    const displayName = data.session.user?.user_metadata?.display_name;
-    if (displayName && !getState().myName) {
-      setState({ myName: displayName });
-    }
-    if (getState().teamCode) {
-      await initSyncIfReady();
-    }
+
+  const state = getState();
+  if (state.teamCode) {
+    await initSyncIfReady();
   }
 
-  // Restore sessions from cache or fetch
   const currentState = getState();
   if (currentState.sessionsCache) {
     allSessions = currentState.sessionsCache;

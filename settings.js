@@ -1,9 +1,8 @@
 // Settings panel
 import { getState, setState, exportData } from './state.js';
 import { fetchSessions } from './data.js';
-import { setDisplayName } from './auth.js';
 
-export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTeamCodeChanged, onSignOut, currentUser }) {
+export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTeamCodeChanged }) {
   const state = getState();
 
   container.innerHTML = `
@@ -85,26 +84,6 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTea
           `}
         </div>
       </div>
-
-      ${currentUser ? `
-      <div class="settings-section" id="section-account">
-        <div class="settings-section-header">
-          <h3>Account</h3>
-          <span class="toggle">▶</span>
-        </div>
-        <div class="settings-section-body hidden">
-          <p class="settings-meta">Signed in as <strong>${escHtml(currentUser.email)}</strong>${currentUser.displayName ? ` · ${escHtml(currentUser.displayName)}` : ''}</p>
-          <div class="settings-row">
-            <input class="settings-input" id="display-name-input" type="text" value="${escHtml(currentUser.displayName ?? '')}" placeholder="Your display name" />
-            <button class="btn" id="save-name-btn">Update name</button>
-          </div>
-          <div class="settings-row">
-            <button class="btn btn-danger" id="sign-out-btn">Sign out</button>
-          </div>
-          <p class="settings-meta" id="account-status"></p>
-        </div>
-      </div>
-      ` : ''}
 
     </div>
   `;
@@ -198,21 +177,6 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTea
     URL.revokeObjectURL(url);
   });
 
-  // --- Sync & Collaboration ---
-  container.querySelector('#save-supabase-btn')?.addEventListener('click', () => {
-    const url = container.querySelector('#supabase-url-input').value.trim();
-    const key = container.querySelector('#supabase-key-input').value.trim();
-    if (!url || !key) {
-      container.querySelector('#supabase-status').textContent = 'Please enter both URL and anon key.';
-      return;
-    }
-    setState(s => ({ ...s, supabaseUrl: url, supabaseAnonKey: key }));
-    container.querySelector('#supabase-status').textContent = '✓ Saved. Connecting…';
-    container.querySelector('#section-sync .settings-section-body').classList.add('hidden');
-    container.querySelector('#section-sync .toggle').textContent = '▶';
-    onSupabaseSaved(url, key);
-  });
-
   // --- Your Team ---
   container.querySelector('#join-team-btn')?.addEventListener('click', () => {
     const code = container.querySelector('#join-code-input')?.value.trim().toUpperCase();
@@ -239,27 +203,6 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTea
 
   container.querySelector('#leave-team-btn')?.addEventListener('click', () => {
     onTeamCodeChanged(null);
-  });
-
-  // --- Account ---
-  container.querySelector('#save-name-btn')?.addEventListener('click', async () => {
-    const name = container.querySelector('#display-name-input')?.value.trim();
-    if (!name) return;
-    const btn = container.querySelector('#save-name-btn');
-    const status = container.querySelector('#account-status');
-    btn.disabled = true;
-    const { error } = await setDisplayName(name);
-    btn.disabled = false;
-    if (error) { status.textContent = `Error: ${error}`; return; }
-    setState({ myName: name });
-    status.textContent = '✓ Name updated';
-  });
-
-  container.querySelector('#sign-out-btn')?.addEventListener('click', async () => {
-    const btn = container.querySelector('#sign-out-btn');
-    btn.disabled = true;
-    await onSignOut();
-    btn.disabled = false;
   });
 }
 

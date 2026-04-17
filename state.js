@@ -13,8 +13,7 @@ function defaultState() {
     sessionsCache: null,
     sessionsCachedAt: null,
     preferences: {},
-    teamCode: '',        // e.g. "SLATE-4X9K" — shared with teammates
-    myName: ''           // e.g. "Lloyd" — confirmed on first login
+    teamCode: ''         // e.g. "SLATE-4X9K" — shared with teammates
   };
 }
 
@@ -48,8 +47,6 @@ export function cycleStatus(current) {
 }
 
 export function setPreference(sessionId, member, status) {
-  // Sync to Supabase only for the current user's own preferences
-  const { myName } = getState();
   setState(s => ({
     ...s,
     preferences: {
@@ -57,10 +54,8 @@ export function setPreference(sessionId, member, status) {
       [sessionId]: { ...(s.preferences[sessionId] ?? {}), [member]: status }
     }
   }));
-  if (syncHandlers && member === myName) {
-    syncHandlers.pushPreference(sessionId, member, status).catch(() => {
-      // Silently swallow sync errors — local write already succeeded
-    });
+  if (syncHandlers) {
+    syncHandlers.pushPreference(sessionId, member, status).catch(() => {});
   }
 }
 

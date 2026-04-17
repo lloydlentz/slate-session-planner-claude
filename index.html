@@ -54,62 +54,6 @@
     <div id="view-settings" class="view hidden"></div>
   </main>
 
-  <div id="setup-modal" class="hidden" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="setup-modal-title">
-    <div class="setup-card">
-
-      <!-- Step: email -->
-      <div class="setup-step" data-step="email">
-        <h2 id="setup-modal-title">Sign in to save your flags</h2>
-        <p class="setup-subtitle">Enter your email to receive a sign-in link.</p>
-        <input type="email" id="setup-email-input" class="setup-input" placeholder="you@example.com" autocomplete="email">
-        <div class="setup-actions">
-          <button id="setup-send-btn" class="btn-primary">Send sign-in link</button>
-          <button id="setup-cancel-btn" class="btn-ghost">Cancel</button>
-        </div>
-      </div>
-
-      <!-- Step: sent -->
-      <div class="setup-step hidden" data-step="sent">
-        <h2>Check your email</h2>
-        <p class="setup-subtitle">We sent a sign-in link to <span id="setup-sent-email"></span>.<br>Click the link to continue.</p>
-        <button id="setup-cancel-from-sent-btn" class="btn-ghost" style="margin-top:12px">Cancel</button>
-      </div>
-
-      <!-- Step: name -->
-      <div class="setup-step hidden" data-step="name">
-        <h2>What's your name on this team?</h2>
-        <input type="text" id="setup-name-input" class="setup-input" placeholder="e.g. Lloyd" autocomplete="name">
-        <div class="setup-actions">
-          <button id="setup-name-btn" class="btn-primary">Set my name</button>
-        </div>
-      </div>
-
-      <!-- Step: team -->
-      <div class="setup-step hidden" data-step="team">
-        <h2>Join or create a team</h2>
-        <p class="setup-subtitle">Have a team code from a colleague?</p>
-        <div class="setup-row">
-          <input type="text" id="setup-team-code-input" class="setup-input" placeholder="e.g. SLATE-4X9K2" autocomplete="off">
-          <button id="setup-join-btn" class="btn-primary">Join team</button>
-        </div>
-        <p class="setup-divider">Or start a new team:</p>
-        <button id="setup-create-btn" class="btn-ghost">Create new team</button>
-      </div>
-
-      <!-- Step: team-created -->
-      <div class="setup-step hidden" data-step="team-created">
-        <h2>Your team code</h2>
-        <p class="setup-subtitle">Share this code with your team so they can see each other's session plans.</p>
-        <div id="setup-team-code-display" class="team-code-display"></div>
-        <div class="setup-actions">
-          <button id="setup-copy-code-btn" class="btn-ghost">Copy code</button>
-          <button id="setup-done-btn" class="btn-primary">Done</button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
   <script type="module" src="app.js"></script>
 </body>
 </html>
