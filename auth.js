@@ -10,7 +10,10 @@ let supabase = null;
  * @param {string} anonKey - Supabase anonymous key
  */
 export function initSupabase(url, anonKey) {
-  supabase = createClient(url, anonKey);
+  if (!url || !anonKey) throw new Error('auth.js: url and anonKey are required');
+  if (!supabase) {
+    supabase = createClient(url, anonKey);
+  }
   return supabase;
 }
 
@@ -22,6 +25,9 @@ export function initSupabase(url, anonKey) {
 export async function sendMagicLink(email) {
   if (!supabase) {
     return { error: 'Supabase not initialized' };
+  }
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return { error: 'A valid email address is required' };
   }
   const { error } = await supabase.auth.signInWithOtp({ email });
   return { error };
@@ -45,6 +51,7 @@ export async function getSession() {
  */
 export function onAuthStateChange(callback) {
   if (!supabase) {
+    console.warn('auth.js: onAuthStateChange called before initSupabase');
     return () => {};
   }
   const { data: { subscription } } = supabase.auth.onAuthStateChange(callback);
@@ -75,6 +82,7 @@ export async function setDisplayName(name) {
   if (!supabase) {
     return { data: null, error: 'Supabase not initialized' };
   }
+  if (!name?.trim()) return { error: 'Display name cannot be empty' };
   return await supabase.auth.updateUser({ data: { display_name: name } });
 }
 
