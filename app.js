@@ -150,12 +150,16 @@ async function initSyncIfReady() {
     if (remoteMembers && remoteMembers.length > 0) {
       setState(s => ({ ...s, team: remoteMembers }));
       rebuildPillGroup('filter-member', remoteMembers);
+    } else {
+      // No team config in Supabase yet — push local members to establish the team
+      pushTeamMembers(getState().team).catch(() => {});
     }
     setSyncHandlers({ pushPreference, pushNote });
     unsubscribeSync = subscribeToChanges(onRemotePreferenceChange, onRemoteNoteChange, onRemoteTeamChange);
     updateSyncDot('connected');
     renderSessionsView();
     if (activeView === 'schedule') renderScheduleView();
+    if (activeView === 'settings') renderSettingsView();
   } catch (err) {
     console.error('Sync init failed:', err);
     updateSyncDot('configured');
