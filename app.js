@@ -67,7 +67,7 @@ function renderSessionsView() {
     setPreference(sessionId, member, newStatus);
     renderSessionsView();
     if (activeView === 'schedule') renderScheduleView();
-  });
+  }, getState().sessionView ?? 'tiles');
 }
 
 function renderScheduleView() {
@@ -96,6 +96,11 @@ function renderSettingsView() {
         if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
         updateSyncDot('hidden');
       }
+      renderSettingsView();
+    },
+    onThemeChange: (theme) => {
+      setState(s => ({ ...s, theme }));
+      document.body.classList.toggle('light-mode', theme === 'light');
       renderSettingsView();
     },
   });
@@ -133,7 +138,16 @@ function escHtml(str) {
 
 // Nav
 document.querySelectorAll('.nav-link').forEach(a => {
-  a.addEventListener('click', e => { e.preventDefault(); showView(a.dataset.view); });
+  if (a.dataset.view) a.addEventListener('click', e => { e.preventDefault(); showView(a.dataset.view); });
+});
+
+// View mode toggle
+document.getElementById('view-mode-toggle').querySelectorAll('.view-mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    setState(s => ({ ...s, sessionView: btn.dataset.mode }));
+    document.querySelectorAll('.view-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === btn.dataset.mode));
+    if (activeView === 'sessions') renderSessionsView();
+  });
 });
 
 async function initSyncIfReady() {
@@ -189,6 +203,14 @@ function onRemoteTeamChange(members) {
 // Init
 (async () => {
   initSupabase();
+
+  // Apply saved theme
+  const savedTheme = getState().theme ?? 'dark';
+  document.body.classList.toggle('light-mode', savedTheme === 'light');
+
+  // Apply saved view mode to toggle buttons
+  const savedView = getState().sessionView ?? 'tiles';
+  document.querySelectorAll('.view-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === savedView));
 
   const state = getState();
   if (state.teamCode) {

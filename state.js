@@ -13,7 +13,9 @@ function defaultState() {
     sessionsCache: null,
     sessionsCachedAt: null,
     preferences: {},
-    teamCode: ''         // e.g. "SLATE-4X9K" — shared with teammates
+    teamCode: '',        // e.g. "SLATE-4X9K" — shared with teammates
+    sessionView: 'tiles',
+    theme: 'dark'
   };
 }
 

@@ -1,6 +1,9 @@
 // Sessions view
 import { getState, setNote, cycleStatus } from './state.js';
-import { getSessionTypes } from './data.js';
+import { getSessionTypes, parseHour } from './data.js';
+
+const DAY_ORDER = ['Wednesday', 'Thursday', 'Friday'];
+const DAY_DATES = { Wednesday: 'June 24', Thursday: 'June 25', Friday: 'June 26' };
 
 export function filterSessions(sessions, filters, preferences, team) {
   const { day, type, member, status } = filters;
@@ -19,7 +22,7 @@ export function filterSessions(sessions, filters, preferences, team) {
   });
 }
 
-export function renderSessions(container, sessions, filters, onStatusChange) {
+export function renderSessions(container, sessions, filters, onStatusChange, viewMode = 'tiles') {
   const state = getState();
   const { preferences, team } = state;
   const filtered = filterSessions(sessions, filters, preferences, team);
@@ -42,24 +45,46 @@ export function renderSessions(container, sessions, filters, onStatusChange) {
     return;
   }
 
-  // Group by type
-  const byType = {};
-  filtered.forEach(s => {
-    if (!byType[s.type]) byType[s.type] = [];
-    byType[s.type].push(s);
-  });
-
   const allTypes = getSessionTypes(sessions);
   const typeColorMap = buildTypeColorMap(allTypes);
 
-  container.innerHTML = Object.entries(byType).map(([type, typeSessions]) => `
-    <div class="session-type-group">
-      <div class="session-type-heading">${escHtml(type)}</div>
-      <div class="sessions-grid">
-        ${typeSessions.map(s => renderCard(s, team, preferences, typeColorMap)).join('')}
+  // Group by day > time
+  const byDay = {};
+  filtered.forEach(s => {
+    if (!byDay[s.day]) byDay[s.day] = {};
+    const t = s.time || 'TBD';
+    if (!byDay[s.day][t]) byDay[s.day][t] = [];
+    byDay[s.day][t].push(s);
+  });
+
+  const days = DAY_ORDER.filter(d => byDay[d]);
+
+  container.innerHTML = days.map(day => {
+    const timeSlots = Object.keys(byDay[day]).sort((a, b) => {
+      const ha = parseHour(a) ?? 999;
+      const hb = parseHour(b) ?? 999;
+      return ha - hb;
+    });
+
+    const dayDate = DAY_DATES[day] ?? '';
+    return `
+      <div class="session-day-group">
+        <div class="session-day-heading">${escHtml(day)}${dayDate ? ` <span class="session-day-date">${escHtml(dayDate)}</span>` : ''}</div>
+        ${timeSlots.map(time => {
+          const timeSessions = byDay[day][time];
+          const content = viewMode === 'list'
+            ? `<div class="sessions-list">${timeSessions.map(s => renderListRow(s, team, preferences, typeColorMap)).join('')}</div>`
+            : `<div class="sessions-grid">${timeSessions.map(s => renderCard(s, team, preferences, typeColorMap)).join('')}</div>`;
+          return `
+            <div class="session-time-group">
+              <div class="session-time-heading">${escHtml(time)}</div>
+              ${content}
+            </div>
+          `;
+        }).join('')}
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   // Attach pill click handlers
   container.querySelectorAll('.team-pill').forEach(pill => {
@@ -69,15 +94,14 @@ export function renderSessions(container, sessions, filters, onStatusChange) {
       const current = pill.dataset.status;
       const next = cycleStatus(current);
       onStatusChange(sessionId, member, next);
-      // DOM update handled by full re-render in app.js callback
     });
   });
 
   // Attach note handlers
   container.querySelectorAll('.note-toggle').forEach(btn => {
     btn.addEventListener('click', () => {
-      const noteArea = btn.closest('.session-card').querySelector('.note-area');
-      noteArea.classList.toggle('open');
+      const row = btn.closest('.session-card, .list-row');
+      row.querySelector('.note-area').classList.toggle('open');
     });
   });
 
@@ -85,13 +109,12 @@ export function renderSessions(container, sessions, filters, onStatusChange) {
     ta.addEventListener('blur', () => {
       const sessionId = ta.dataset.session;
       setNote(sessionId, ta.value);
-      const card = ta.closest('.session-card');
-      const toggle = card.querySelector('.note-toggle');
-      toggle.classList.toggle('has-note', ta.value.trim().length > 0);
+      const row = ta.closest('.session-card, .list-row');
+      row.querySelector('.note-toggle').classList.toggle('has-note', ta.value.trim().length > 0);
     });
   });
 
-  // Attach description expand handlers
+  // Attach description expand handlers (tiles only)
   container.querySelectorAll('.desc-expand-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const descEl = btn.previousElementSibling;
@@ -127,8 +150,8 @@ function renderCard(session, team, preferences, typeColorMap) {
           ${speakerHtml}
         </div>
         <div class="card-badges">
-          <span class="badge badge-day">${escHtml(session.dayLabel)}</span>
           <span class="badge badge-type badge-type-${colorIdx}">${escHtml(session.type)}</span>
+          ${session.location ? `<span class="badge badge-location">${escHtml(session.location)}</span>` : ''}
         </div>
       </div>
       ${session.description ? `
@@ -139,6 +162,42 @@ function renderCard(session, team, preferences, typeColorMap) {
       <div class="card-footer">
         ${pillsHtml}
         <button class="note-toggle ${hasNote ? 'has-note' : ''}" data-session="${escHtml(session.id)}" title="Notes">💬</button>
+      </div>
+      <div class="note-area ${hasNote ? 'open' : ''}">
+        <textarea data-session="${escHtml(session.id)}" placeholder="Add notes about this session…">${escHtml(note)}</textarea>
+      </div>
+    </div>
+  `;
+}
+
+function renderListRow(session, team, preferences, typeColorMap) {
+  const sessionPrefs = preferences[session.id] ?? {};
+  const note = sessionPrefs.note ?? '';
+  const hasNote = note.trim().length > 0;
+  const colorIdx = typeColorMap[session.type] ?? 0;
+
+  const pillsHtml = team.length > 0
+    ? team.map(m => {
+        const status = sessionPrefs[m] ?? 'none';
+        return `<button class="team-pill" data-session="${escHtml(session.id)}" data-member="${escHtml(m)}" data-status="${escHtml(status)}">${pillLabel(m, status)}</button>`;
+      }).join('')
+    : '';
+
+  return `
+    <div class="list-row">
+      <div class="list-row-main">
+        <div class="list-row-info">
+          <div class="list-row-title">${escHtml(session.title)}</div>
+          ${session.speakers.length > 0 ? `<div class="list-row-speaker">${escHtml(session.speakers.join(', '))}</div>` : ''}
+        </div>
+        <div class="list-row-meta">
+          <span class="badge badge-type badge-type-${colorIdx}">${escHtml(session.type)}</span>
+          ${session.location ? `<span class="list-row-location">${escHtml(session.location)}</span>` : ''}
+        </div>
+        <div class="list-row-actions">
+          ${pillsHtml}
+          <button class="note-toggle ${hasNote ? 'has-note' : ''}" data-session="${escHtml(session.id)}" title="Notes">💬</button>
+        </div>
       </div>
       <div class="note-area ${hasNote ? 'open' : ''}">
         <textarea data-session="${escHtml(session.id)}" placeholder="Add notes about this session…">${escHtml(note)}</textarea>

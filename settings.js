@@ -2,7 +2,7 @@
 import { getState, setState, exportData } from './state.js';
 import { fetchSessions } from './data.js';
 
-export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTeamCodeChanged }) {
+export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTeamCodeChanged, onThemeChange }) {
   const state = getState();
 
   container.innerHTML = `
@@ -11,9 +11,9 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTea
       <div class="settings-section" id="section-team">
         <div class="settings-section-header">
           <h3>Team Members</h3>
-          <span class="toggle">${state.team.length > 0 ? '▶' : '▼'}</span>
+          <span class="toggle">▼</span>
         </div>
-        <div class="settings-section-body ${state.team.length > 0 ? 'hidden' : ''}">
+        <div class="settings-section-body">
           <div class="team-list" id="team-list">
             ${renderTeamList(state.team)}
           </div>
@@ -30,9 +30,9 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTea
       <div class="settings-section" id="section-endpoint">
         <div class="settings-section-header">
           <h3>Session Data</h3>
-          <span class="toggle">${state.sessionsCache ? '▶' : '▼'}</span>
+          <span class="toggle">▼</span>
         </div>
-        <div class="settings-section-body ${state.sessionsCache ? 'hidden' : ''}">
+        <div class="settings-section-body">
           <div class="settings-row" style="margin-top: 12px;">
             <input class="settings-input" id="endpoint-input" type="url" value="${escHtml(state.endpoint)}" />
           </div>
@@ -58,12 +58,26 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTea
         </div>
       </div>
 
+      <div class="settings-section" id="section-appearance">
+        <div class="settings-section-header">
+          <h3>Appearance</h3>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="settings-section-body">
+          <p class="settings-meta">Choose your preferred color scheme.</p>
+          <div class="settings-row">
+            <button class="btn ${state.theme !== 'light' ? '' : 'btn-secondary'}" id="theme-dark-btn">Dark</button>
+            <button class="btn ${state.theme === 'light' ? '' : 'btn-secondary'}" id="theme-light-btn">Light</button>
+          </div>
+        </div>
+      </div>
+
       <div class="settings-section" id="section-team-code">
         <div class="settings-section-header">
           <h3>Your Team</h3>
-          <span class="toggle">${state.teamCode ? '▶' : '▼'}</span>
+          <span class="toggle">▼</span>
         </div>
-        <div class="settings-section-body ${state.teamCode ? 'hidden' : ''}">
+        <div class="settings-section-body">
           ${state.teamCode ? `
             <p class="settings-meta">Team code: <span class="team-code-display">${escHtml(state.teamCode)}</span></p>
             <div class="settings-row">
@@ -133,8 +147,6 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTea
 
   container.querySelector('#save-team-btn').addEventListener('click', () => {
     setState(s => ({ ...s, team: pendingTeam }));
-    container.querySelector('#section-team .settings-section-body').classList.add('hidden');
-    container.querySelector('#section-team .toggle').textContent = '▶';
     onTeamSaved(pendingTeam);
   });
 
@@ -155,8 +167,6 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTea
         sessionsCachedAt: Date.now()
       }));
       status.textContent = `Loaded ${sessions.length} sessions at ${new Date().toLocaleString()}`;
-      container.querySelector('#section-endpoint .settings-section-body').classList.add('hidden');
-      container.querySelector('#section-endpoint .toggle').textContent = '▶';
       onSessionsLoaded(sessions);
     } catch (err) {
       status.textContent = `Error: ${err.message}`;
@@ -204,6 +214,10 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onTea
   container.querySelector('#leave-team-btn')?.addEventListener('click', () => {
     onTeamCodeChanged(null);
   });
+
+  // --- Appearance ---
+  container.querySelector('#theme-dark-btn').addEventListener('click', () => onThemeChange('dark'));
+  container.querySelector('#theme-light-btn').addEventListener('click', () => onThemeChange('light'));
 }
 
 function renderTeamList(team) {
