@@ -36,8 +36,8 @@ export function setState(updater) {
   return next;
 }
 
-export function setSyncHandlers({ pushPreference, pushNote }) {
-  syncHandlers = { pushPreference, pushNote };
+export function setSyncHandlers(handlers) {
+  syncHandlers = handlers;
 }
 
 export function getPreference(sessionId, member) {
@@ -50,6 +50,8 @@ export function cycleStatus(current) {
 }
 
 export function setPreference(sessionId, member, status) {
+  // Sync to Supabase only for the current user's own preferences
+  const { myName } = getState();
   setState(s => ({
     ...s,
     preferences: {
@@ -57,8 +59,6 @@ export function setPreference(sessionId, member, status) {
       [sessionId]: { ...(s.preferences[sessionId] ?? {}), [member]: status }
     }
   }));
-  // Sync to Supabase only for the current user's own preferences
-  const { myName } = getState();
   if (syncHandlers && member === myName) {
     syncHandlers.pushPreference(sessionId, member, status).catch(() => {
       // Silently swallow sync errors — local write already succeeded
