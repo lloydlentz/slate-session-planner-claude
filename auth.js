@@ -1,13 +1,17 @@
-// auth.js — Supabase client + magic link + display name
+// auth.js — Optional Supabase client for team sharing + magic link + display name
+// Login is only required if user wants to share/sync their plan with a team.
+// Local plan building works without authentication.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 let supabase = null;
 
 /**
- * Initialize Supabase client with provided credentials.
+ * Initialize Supabase client with provided credentials (optional).
+ * Only required if user wants to share/sync their plan with a team.
  * The client automatically handles magic link token in URL hash on init.
  * @param {string} url - Supabase project URL
  * @param {string} anonKey - Supabase anonymous key
+ * @returns {object} Supabase client instance
  */
 export function initSupabase(url, anonKey) {
   if (!url || !anonKey) throw new Error('auth.js: url and anonKey are required');
@@ -18,7 +22,8 @@ export function initSupabase(url, anonKey) {
 }
 
 /**
- * Send a magic link to the given email.
+ * Send a magic link to the given email for team sharing/sync.
+ * User must have authenticated (initSupabase called) before using this.
  * @param {string} email - User email address
  * @returns {Promise<{error: null | object}>}
  */
