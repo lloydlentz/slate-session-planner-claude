@@ -23,6 +23,7 @@ let fetchInProgress = false;
 let pendingAction = null;       // { sessionId, member, newStatus } waiting for auth
 let isAuthenticated = false;   // tracks current auth state
 let unsubscribeSync = null;    // cleanup fn for realtime subscription
+let unsubscribeAuth = null;    // cleanup fn for auth state listener
 let syncInitInProgress = false;
 let currentUserEmail = '';
 
@@ -123,7 +124,8 @@ function renderSettingsView() {
       try {
         initSupabase(url, key);
         updateSyncDot('configured');
-        onAuthStateChange(handleAuthStateChange);
+        if (unsubscribeAuth) { unsubscribeAuth(); unsubscribeAuth = null; }
+        unsubscribeAuth = onAuthStateChange(handleAuthStateChange);
       } catch (err) {
         console.error('Supabase init failed:', err);
       }
@@ -327,6 +329,8 @@ async function handleAuthStateChange(event, session) {
     if (unsubscribeSync) { unsubscribeSync(); unsubscribeSync = null; }
     setState({ myName: '' });
     updateSyncDot('configured');
+    // Re-render settings if it's the active view, so Account section disappears
+    if (activeView === 'settings') renderSettingsView();
     return;
   }
   // User signed in — read display name from session metadata
@@ -364,7 +368,7 @@ async function handleAuthStateChange(event, session) {
     updateSyncDot('configured');
     initSupabase(state.supabaseUrl, state.supabaseAnonKey);
     // Register auth state change handler now that Supabase client exists
-    onAuthStateChange(handleAuthStateChange);
+    unsubscribeAuth = onAuthStateChange(handleAuthStateChange);
     // Also check current session immediately
     const result = await getSession();
     const data = result?.data;

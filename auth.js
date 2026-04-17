@@ -4,20 +4,22 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 let supabase = null;
+let configuredUrl = null;
 
 /**
  * Initialize Supabase client with provided credentials (optional).
  * Only required if user wants to share/sync their plan with a team.
  * The client automatically handles magic link token in URL hash on init.
+ * Re-initializes if the URL has changed (e.g. user updates credentials).
  * @param {string} url - Supabase project URL
  * @param {string} anonKey - Supabase anonymous key
  * @returns {object} Supabase client instance
  */
 export function initSupabase(url, anonKey) {
   if (!url || !anonKey) throw new Error('auth.js: url and anonKey are required');
-  if (!supabase) {
-    supabase = createClient(url, anonKey);
-  }
+  if (supabase && configuredUrl === url) return supabase;  // same URL, reuse
+  supabase = createClient(url, anonKey);
+  configuredUrl = url;
   return supabase;
 }
 

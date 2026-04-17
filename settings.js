@@ -249,8 +249,6 @@ export function renderSettings(container, { onTeamSaved, onSessionsLoaded, onSup
 
   container.querySelector('#create-team-btn')?.addEventListener('click', () => {
     const code = 'SLATE-' + Math.random().toString(36).substring(2, 7).toUpperCase();
-    const status = container.querySelector('#team-code-status');
-    if (status) status.textContent = `Your code: ${code} — share this with your team!`;
     onTeamCodeChanged(code);
   });
 
