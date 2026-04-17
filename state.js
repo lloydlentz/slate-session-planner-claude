@@ -3,13 +3,20 @@ const KEY = 'conferencePlanner';
 
 const DEFAULT_ENDPOINT = 'https://slate-partners.technolutions.net/manage/query/run?id=8b7142c2-6c70-4109-9eeb-74d2494ba7c8&cmd=service&output=json&h=b0203357-4804-4c5d-8213-9e376263af44';
 
+// Module-level sync handlers registry
+let syncHandlers = null;
+
 function defaultState() {
   return {
     team: ['Lloyd', 'Kathryn', 'Austin'],
     endpoint: DEFAULT_ENDPOINT,
     sessionsCache: null,
     sessionsCachedAt: null,
-    preferences: {}
+    preferences: {},
+    supabaseUrl: '',     // Supabase project URL
+    supabaseAnonKey: '', // Supabase anon key
+    teamCode: '',        // e.g. "SLATE-4X9K" — shared with teammates
+    myName: ''           // e.g. "Lloyd" — confirmed on first login
   };
 }
 
@@ -29,6 +36,10 @@ export function setState(updater) {
   return next;
 }
 
+export function setSyncHandlers({ pushPreference, pushNote }) {
+  syncHandlers = { pushPreference, pushNote };
+}
+
 export function getPreference(sessionId, member) {
   return getState().preferences[sessionId]?.[member] ?? 'none';
 }
@@ -46,6 +57,13 @@ export function setPreference(sessionId, member, status) {
       [sessionId]: { ...(s.preferences[sessionId] ?? {}), [member]: status }
     }
   }));
+  // Sync to Supabase only for the current user's own preferences
+  const { myName } = getState();
+  if (syncHandlers && member === myName) {
+    syncHandlers.pushPreference(sessionId, member, status).catch(() => {
+      // Silently swallow sync errors — local write already succeeded
+    });
+  }
 }
 
 export function getNote(sessionId) {
@@ -60,8 +78,32 @@ export function setNote(sessionId, note) {
       [sessionId]: { ...(s.preferences[sessionId] ?? {}), note }
     }
   }));
+  if (syncHandlers) {
+    syncHandlers.pushNote(sessionId, note).catch(() => {
+      // Silently swallow sync errors — local write already succeeded
+    });
+  }
 }
 
 export function exportData() {
   return JSON.stringify(getState(), null, 2);
+}
+
+export function loadRemoteState(prefRows, noteRows) {
+  setState(s => {
+    const prefs = { ...s.preferences };
+    for (const row of prefRows) {
+      prefs[row.session_id] = {
+        ...(prefs[row.session_id] ?? {}),
+        [row.member_name]: row.status
+      };
+    }
+    for (const row of noteRows) {
+      prefs[row.session_id] = {
+        ...(prefs[row.session_id] ?? {}),
+        note: row.note
+      };
+    }
+    return { ...s, preferences: prefs };
+  });
 }
