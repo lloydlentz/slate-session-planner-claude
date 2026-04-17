@@ -5,7 +5,7 @@ import { renderSettings } from './settings.js';
 import { renderSchedule } from './schedule.js';
 import { renderSessions } from './sessions.js';
 import { initSupabase, getClient } from './auth.js';
-import { initSync, fetchAllPreferences, fetchAllNotes, pushPreference, pushNote, subscribeToChanges } from './sync.js';
+import { initSync, fetchAllPreferences, fetchAllNotes, fetchTeamMembers, pushPreference, pushNote, pushTeamMembers, subscribeToChanges } from './sync.js';
 import { setPreference, setSyncHandlers, loadRemoteState } from './state.js';
 
 const views = {
@@ -80,6 +80,7 @@ function renderSettingsView() {
     onTeamSaved: (team) => {
       rebuildPillGroup('filter-member', team);
       if (activeView === 'sessions') renderSessionsView();
+      if (getState().teamCode) pushTeamMembers(team).catch(() => {});
     },
     onSessionsLoaded: (sessions) => {
       allSessions = sessions;
@@ -144,10 +145,14 @@ async function initSyncIfReady() {
   updateSyncDot('configured');
   try {
     initSync(getClient(), s.teamCode);
-    const [prefRows, noteRows] = await Promise.all([fetchAllPreferences(), fetchAllNotes()]);
+    const [prefRows, noteRows, remoteMembers] = await Promise.all([fetchAllPreferences(), fetchAllNotes(), fetchTeamMembers()]);
     loadRemoteState(prefRows, noteRows);
+    if (remoteMembers && remoteMembers.length > 0) {
+      setState(s => ({ ...s, team: remoteMembers }));
+      rebuildPillGroup('filter-member', remoteMembers);
+    }
     setSyncHandlers({ pushPreference, pushNote });
-    unsubscribeSync = subscribeToChanges(onRemotePreferenceChange, onRemoteNoteChange);
+    unsubscribeSync = subscribeToChanges(onRemotePreferenceChange, onRemoteNoteChange, onRemoteTeamChange);
     updateSyncDot('connected');
     renderSessionsView();
     if (activeView === 'schedule') renderScheduleView();
@@ -168,6 +173,13 @@ function onRemotePreferenceChange(row) {
 function onRemoteNoteChange(row) {
   loadRemoteState([], [row]);
   if (activeView === 'sessions') renderSessionsView();
+}
+
+function onRemoteTeamChange(members) {
+  setState(s => ({ ...s, team: members }));
+  rebuildPillGroup('filter-member', members);
+  if (activeView === 'sessions') renderSessionsView();
+  if (activeView === 'settings') renderSettingsView();
 }
 
 // Init

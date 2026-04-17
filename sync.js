@@ -149,38 +149,67 @@ export async function pushNote(sessionId, note) {
   }
 }
 
-/**
- * Subscribe to realtime changes for member preferences and session notes.
- * @param {Function} onPreferenceChange - Callback for preference changes
- * @param {Function} onNoteChange - Callback for note changes
- * @returns {Function} Unsubscribe function
- */
-export function subscribeToChanges(onPreferenceChange, onNoteChange) {
+export async function fetchTeamMembers() {
+  if (!client || !currentTeamCode) return null;
+  try {
+    const { data, error } = await client
+      .from('team_config')
+      .select('members')
+      .eq('team_code', currentTeamCode)
+      .single();
+    if (error) return null;
+    return data?.members ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function pushTeamMembers(members) {
+  if (!client || !currentTeamCode) return;
+  await client.from('team_config').upsert({
+    team_code: currentTeamCode,
+    members,
+    updated_at: new Date().toISOString()
+  }).catch(() => {});
+}
+
+export function subscribeToChanges(onPreferenceChange, onNoteChange, onTeamChange) {
   if (!client || !currentTeamCode) {
     return () => {};
   }
 
+  const tc = currentTeamCode;
   const channel = client
-    .channel(`team-changes-${currentTeamCode}`)
+    .channel(`team-changes-${tc}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'member_preferences' },
-      (payload) => { if (payload.new.team_code === currentTeamCode) onPreferenceChange(payload.new); }
+      (payload) => { if (payload.new.team_code === tc) onPreferenceChange(payload.new); }
     )
     .on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'member_preferences' },
-      (payload) => { if (payload.new.team_code === currentTeamCode) onPreferenceChange(payload.new); }
+      (payload) => { if (payload.new.team_code === tc) onPreferenceChange(payload.new); }
     )
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'session_notes' },
-      (payload) => { if (payload.new.team_code === currentTeamCode) onNoteChange(payload.new); }
+      (payload) => { if (payload.new.team_code === tc) onNoteChange(payload.new); }
     )
     .on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'session_notes' },
-      (payload) => { if (payload.new.team_code === currentTeamCode) onNoteChange(payload.new); }
+      (payload) => { if (payload.new.team_code === tc) onNoteChange(payload.new); }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'team_config' },
+      (payload) => { if (payload.new.team_code === tc) onTeamChange(payload.new.members); }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'team_config' },
+      (payload) => { if (payload.new.team_code === tc) onTeamChange(payload.new.members); }
     )
     .subscribe();
 
