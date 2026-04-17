@@ -156,7 +156,7 @@ export async function fetchTeamMembers() {
       .from('team_config')
       .select('members')
       .eq('team_code', currentTeamCode)
-      .single();
+      .maybeSingle();
     if (error) return null;
     return data?.members ?? null;
   } catch {
