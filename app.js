@@ -12,7 +12,10 @@ const views = {
   sessions: document.getElementById('view-sessions'),
   schedule: document.getElementById('view-schedule'),
   settings: document.getElementById('view-settings'),
+  about:    document.getElementById('view-about'),
 };
+
+const CACHE_TTL_MS = 48 * 60 * 60 * 1000;
 
 const filterStrip = document.getElementById('filter-strip');
 
@@ -33,6 +36,7 @@ function showView(name) {
   if (name === 'settings') renderSettingsView();
   if (name === 'sessions') renderSessionsView();
   if (name === 'schedule') renderScheduleView();
+  if (name === 'about') renderAboutView();
 }
 
 function getActiveFilter(groupId) {
@@ -78,6 +82,69 @@ function renderSessionsView() {
 function renderScheduleView() {
   const memberFilter = getActiveFilter('filter-member');
   renderSchedule(views.schedule, allSessions, memberFilter);
+}
+
+function renderAboutView() {
+  views.about.innerHTML = `
+    <div class="about-page">
+      <h2>About This App</h2>
+      <p class="about-intro">A team planning tool for Slate Summit 2026 — browse sessions, mark your plans, and stay in sync with your colleagues.</p>
+
+      <section class="about-section">
+        <h3>Browsing Sessions</h3>
+        <ul>
+          <li>Use the <strong>filter bar</strong> to narrow sessions by Day, Type, Team Member, or Status.</li>
+          <li>Switch between <strong>⊞ Tiles</strong> and <strong>☰ List</strong> view using the toggle in the filter bar.</li>
+          <li>Sessions are grouped by day and time slot.</li>
+        </ul>
+      </section>
+
+      <section class="about-section">
+        <h3>Marking Sessions</h3>
+        <ul>
+          <li>Click the <strong>Interested</strong> or <strong>Going</strong> buttons on any session card to set your status.</li>
+          <li>Filter by <em>Status → Going</em> or <em>Status → Interested</em> to see your shortlist.</li>
+          <li>Click the <strong>note icon</strong> on a card to add or edit a private note for that session.</li>
+        </ul>
+      </section>
+
+      <section class="about-section">
+        <h3>Schedule View</h3>
+        <ul>
+          <li>The <strong>Schedule</strong> tab shows only sessions your team has marked as <em>Going</em>.</li>
+          <li>Sessions are laid out in a time-grid for each day so you can spot conflicts at a glance.</li>
+          <li>Use the Member filter to focus on one person's schedule.</li>
+        </ul>
+      </section>
+
+      <section class="about-section">
+        <h3>Team Sync</h3>
+        <ul>
+          <li>Go to <strong>⚙ Settings</strong> and generate or enter a <strong>Team Code</strong> to sync with colleagues.</li>
+          <li>Anyone who enters the same code will share session statuses and notes in real time.</li>
+          <li>The <strong>sync dot</strong> in the top-right corner shows connection status: grey = configured, green = live.</li>
+          <li>Team members can be customised in Settings — changes sync automatically.</li>
+        </ul>
+      </section>
+
+      <section class="about-section">
+        <h3>Session Data</h3>
+        <ul>
+          <li>Session data is cached locally and <strong>auto-refreshes after 48 hours</strong>.</li>
+          <li>You can force a refresh at any time via <strong>⚙ Settings → Load Sessions</strong>.</li>
+          <li>The data endpoint can also be changed in Settings if needed.</li>
+        </ul>
+      </section>
+
+      <section class="about-section">
+        <h3>Other Features</h3>
+        <ul>
+          <li>Toggle <strong>light/dark mode</strong> with the ☀️/🌙 button in the top-right nav.</li>
+          <li>Export your team's preferences as JSON from Settings.</li>
+          <li>Have a bug or idea? Use the <a href="https://github.com/lloydlentz/slate-session-planner-claude/issues" target="_blank" rel="noopener">Feedback</a> link in the nav.</li>
+        </ul>
+      </section>
+    </div>`;
 }
 
 function renderSettingsView() {
@@ -232,7 +299,10 @@ function onRemoteTeamChange(members) {
   }
 
   const currentState = getState();
-  if (currentState.sessionsCache) {
+  const cacheAge = currentState.sessionsCachedAt ? Date.now() - currentState.sessionsCachedAt : Infinity;
+  const cacheValid = currentState.sessionsCache && cacheAge < CACHE_TTL_MS;
+
+  if (cacheValid) {
     allSessions = currentState.sessionsCache;
     rebuildPillGroup('filter-type', getSessionTypes(allSessions));
     if (currentState.team.length > 0) rebuildPillGroup('filter-member', currentState.team);
@@ -240,7 +310,10 @@ function onRemoteTeamChange(members) {
   } else {
     fetchInProgress = true;
     showView('sessions');
-    views.sessions.innerHTML = `<div class="loading">Loading sessions…</div>`;
+    const staleMsg = currentState.sessionsCache
+      ? `<div class="loading">Session data is over 48 hours old — refreshing…</div>`
+      : `<div class="loading">Loading sessions…</div>`;
+    views.sessions.innerHTML = staleMsg;
     fetchSessions(currentState.endpoint)
       .then(sessions => {
         fetchInProgress = false;
@@ -253,9 +326,17 @@ function onRemoteTeamChange(members) {
       })
       .catch(err => {
         fetchInProgress = false;
-        views.sessions.innerHTML = `
-          <div class="error-msg">Failed to load sessions: ${err.message}</div>
-          <div class="empty-state"><h3>Could not load sessions</h3><p>Go to ⚙ Settings to configure the data endpoint and try again.</p></div>`;
+        // If refresh fails but we have stale data, fall back to it rather than showing an error
+        if (currentState.sessionsCache) {
+          allSessions = currentState.sessionsCache;
+          rebuildPillGroup('filter-type', getSessionTypes(allSessions));
+          if (currentState.team.length > 0) rebuildPillGroup('filter-member', currentState.team);
+          renderSessionsView();
+        } else {
+          views.sessions.innerHTML = `
+            <div class="error-msg">Failed to load sessions: ${err.message}</div>
+            <div class="empty-state"><h3>Could not load sessions</h3><p>Go to ⚙ Settings to configure the data endpoint and try again.</p></div>`;
+        }
       });
   }
 })();
