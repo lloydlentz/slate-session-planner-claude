@@ -9,8 +9,9 @@ const DAYS = [
   { key: 'Friday',    label: 'Fri 6/26' },
 ];
 
-// Hours to display in the grid (7 AM through 6 PM inclusive)
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 7); // [7,8,...,18]
+const HOURS = Array.from({ length: 12 }, (_, i) => i + 7);
+
+let _modalKeydownListener = null;
 
 function formatHour(h) {
   if (h === 0) return '12 AM';
@@ -24,7 +25,6 @@ export function renderSchedule(container, sessions, memberFilter = 'All') {
   const allTypes = getSessionTypes(sessions);
   const typeColorMap = buildTypeColorMap(allTypes);
 
-  // Build a lookup: { day: { hour: [{ session, goingMembers }, ...] } }
   const grid = {};
   const tbdSessions = [];
 
@@ -36,30 +36,62 @@ export function renderSchedule(container, sessions, memberFilter = 'All') {
   sessions.forEach(session => {
     const sessionPrefs = preferences[session.id] ?? {};
     const goingMembers = team.filter(m => sessionPrefs[m] === 'going');
-    if (goingMembers.length === 0) return;
-    if (memberFilter !== 'All' && !goingMembers.includes(memberFilter)) return;
+    const interestedMembers = team.filter(m => sessionPrefs[m] === 'interested');
+
+    if (goingMembers.length === 0 && interestedMembers.length === 0) return;
+
+    if (memberFilter !== 'All') {
+      const memberStatus = sessionPrefs[memberFilter] ?? 'none';
+      if (memberStatus === 'none') return;
+    }
 
     const hour = parseHour(session.time);
     if (hour === null || !grid[session.day]) {
-      tbdSessions.push({ session, goingMembers });
+      tbdSessions.push({ session, goingMembers, interestedMembers });
       return;
     }
     const slot = grid[session.day]?.[hour];
     if (slot) {
-      slot.push({ session, goingMembers });
+      slot.push({ session, goingMembers, interestedMembers });
     } else {
-      tbdSessions.push({ session, goingMembers });
+      tbdSessions.push({ session, goingMembers, interestedMembers });
     }
   });
 
-  // Remove stale tooltip if present
-  const oldTooltip = document.getElementById('schedule-tooltip');
-  if (oldTooltip) oldTooltip.remove();
+  // Remove stale modal + keydown
+  const oldModal = document.getElementById('schedule-modal');
+  if (oldModal) oldModal.remove();
+  if (_modalKeydownListener) {
+    document.removeEventListener('keydown', _modalKeydownListener);
+    _modalKeydownListener = null;
+  }
 
-  const tooltip = document.createElement('div');
-  tooltip.className = 'tooltip hidden';
-  tooltip.id = 'schedule-tooltip';
-  document.body.appendChild(tooltip);
+  const modal = document.createElement('div');
+  modal.id = 'schedule-modal';
+  modal.className = 'schedule-modal hidden';
+  modal.innerHTML = `
+    <div class="schedule-modal-backdrop"></div>
+    <div class="schedule-modal-content" role="dialog" aria-modal="true">
+      <button class="schedule-modal-close" aria-label="Close">&times;</button>
+      <div class="schedule-modal-body"></div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  function closeModal() { modal.classList.add('hidden'); }
+  modal.querySelector('.schedule-modal-backdrop').addEventListener('click', closeModal);
+  modal.querySelector('.schedule-modal-close').addEventListener('click', closeModal);
+
+  _modalKeydownListener = (e) => { if (e.key === 'Escape') closeModal(); };
+  document.addEventListener('keydown', _modalKeydownListener);
+
+  function memberLine(going, interested) {
+    const parts = [
+      ...going.map(m => `✓ ${m}`),
+      ...interested.map(m => `★ ${m}`),
+    ];
+    return parts.join('  ·  ');
+  }
 
   const gridHtml = `
     <div class="schedule-container">
@@ -73,16 +105,27 @@ export function renderSchedule(container, sessions, memberFilter = 'All') {
             const isAlt = rowIdx % 2 === 1;
             return `
               <div class="schedule-cell ${isAlt ? 'alt' : ''}">
-                ${blocks.map(({ session, goingMembers }) => `
-                  <div class="session-block type-color-${typeColorMap[session.type] ?? 0}"
-                    data-session-id="${escHtmlAttr(session.id)}">
-                    <div class="session-block-title">${escHtml(session.title)}</div>
-                    <div class="session-block-members">${escHtml(goingMembers.map(m => m[0]).join(' · '))}</div>
-                  </div>
-                `).join('')}
+                ${blocks.map(({ session, goingMembers, interestedMembers }) => {
+                  const interestedOnly = goingMembers.length === 0;
+                  const initials = [
+                    ...goingMembers.map(m => `✓${m[0]}`),
+                    ...interestedMembers.map(m => `★${m[0]}`),
+                  ].join(' ');
+                  return `
+                    <div class="session-block type-color-${typeColorMap[session.type] ?? 0}${interestedOnly ? ' status-interested' : ''}"
+                      data-session-id="${escHtmlAttr(session.id)}">
+                      <div class="session-block-title">${escHtml(session.title)}</div>
+                      <div class="session-block-members">${escHtml(initials)}</div>
+                    </div>
+                  `;
+                }).join('')}
               </div>`;
           }).join('')}
         `).join('')}
+      </div>
+      <div class="schedule-legend">
+        <span class="legend-item legend-going">✓ Going</span>
+        <span class="legend-item legend-interested">★ Interested</span>
       </div>
     </div>
   `;
@@ -91,10 +134,10 @@ export function renderSchedule(container, sessions, memberFilter = 'All') {
     <div class="tbd-section">
       <h3>Time TBD</h3>
       <div class="tbd-list">
-        ${tbdSessions.map(({ session, goingMembers }) => `
+        ${tbdSessions.map(({ session, goingMembers, interestedMembers }) => `
           <div class="tbd-item">
             <strong>${escHtml(session.title)}</strong>
-            <span style="color:var(--text-muted);margin-left:8px;font-size:11px">${escHtml(goingMembers.join(', '))}</span>
+            <span class="tbd-members">${escHtml(memberLine(goingMembers, interestedMembers))}</span>
           </div>
         `).join('')}
       </div>
@@ -103,39 +146,27 @@ export function renderSchedule(container, sessions, memberFilter = 'All') {
 
   container.innerHTML = gridHtml + tbdHtml;
 
-  // Build session lookup for tooltip
   const sessionById = Object.fromEntries(sessions.map(s => [s.id, s]));
 
-  // Tooltip handlers
   container.querySelectorAll('.session-block').forEach(block => {
-    block.addEventListener('mouseenter', e => {
+    block.addEventListener('click', () => {
       const s = sessionById[block.dataset.sessionId];
       if (!s) return;
-      tooltip.innerHTML = `
-        <div class="tooltip-title">${escHtml(s.title)}</div>
-        ${s.speakers.length ? `<div class="tooltip-speaker">${escHtml(s.speakers.join(', '))}</div>` : ''}
-        ${s.description ? `<div class="tooltip-desc">${escHtml(s.description.slice(0, 200))}${s.description.length > 200 ? '…' : ''}</div>` : ''}
-        <div class="tooltip-meta">${escHtml(s.type)} · ${escHtml(s.dayLabel)} · ${escHtml(s.time)} · ${escHtml(s.location)}</div>
+      const sessionPrefs = preferences[s.id] ?? {};
+      const going = team.filter(m => sessionPrefs[m] === 'going');
+      const interested = team.filter(m => sessionPrefs[m] === 'interested');
+
+      modal.querySelector('.schedule-modal-body').innerHTML = `
+        <div class="modal-title">${escHtml(s.title)}</div>
+        ${s.speakers.length ? `<div class="modal-speaker">${escHtml(s.speakers.join(', '))}</div>` : ''}
+        <div class="modal-meta">${escHtml(s.type)}${s.dayLabel ? ` · ${escHtml(s.dayLabel)}` : ''} · ${escHtml(s.time)}${s.location ? ` · ${escHtml(s.location)}` : ''}</div>
+        ${s.description ? `<div class="modal-desc">${escHtml(s.description)}</div>` : ''}
+        ${going.length ? `<div class="modal-members modal-going">✓ Going: ${escHtml(going.join(', '))}</div>` : ''}
+        ${interested.length ? `<div class="modal-members modal-interested">★ Interested: ${escHtml(interested.join(', '))}</div>` : ''}
       `;
-      tooltip.classList.remove('hidden');
-      positionTooltip(e, tooltip);
+      modal.classList.remove('hidden');
     });
-
-    block.addEventListener('mousemove', e => positionTooltip(e, tooltip));
-    block.addEventListener('mouseleave', () => tooltip.classList.add('hidden'));
   });
-}
-
-function positionTooltip(e, tooltip) {
-  const margin = 12;
-  let x = e.clientX + margin;
-  let y = e.clientY + margin;
-  const tw = tooltip.offsetWidth || 280;
-  const th = tooltip.offsetHeight || 120;
-  if (x + tw > window.innerWidth - margin) x = e.clientX - tw - margin;
-  if (y + th > window.innerHeight - margin) y = e.clientY - th - margin;
-  tooltip.style.left = x + 'px';
-  tooltip.style.top  = y + 'px';
 }
 
 function escHtml(str) {

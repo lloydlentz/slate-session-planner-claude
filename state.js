@@ -44,7 +44,7 @@ export function getPreference(sessionId, member) {
 }
 
 export function cycleStatus(current) {
-  const cycle = { none: 'interested', interested: 'going', going: 'none' };
+  const cycle = { none: 'going', going: 'interested', interested: 'none' };
   return cycle[current] ?? 'none';
 }
 

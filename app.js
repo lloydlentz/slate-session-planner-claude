@@ -26,8 +26,8 @@ let unsubscribeSync = null;
 let syncInitInProgress = false;
 
 function showView(name) {
-  const oldTooltip = document.getElementById('schedule-tooltip');
-  if (oldTooltip) oldTooltip.remove();
+  const oldModal = document.getElementById('schedule-modal');
+  if (oldModal) oldModal.remove();
 
   activeView = name;
   Object.entries(views).forEach(([k, el]) => el.classList.toggle('hidden', k !== name));

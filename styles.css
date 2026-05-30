@@ -438,11 +438,119 @@ a { color: inherit; text-decoration: none; }
 .tooltip-meta { font-size: 10px; color: #475569; margin-top: 6px; }
 .tooltip.hidden { display: none; }
 
+/* Interested-only schedule blocks */
+.session-block.status-interested {
+  opacity: 0.72;
+  border-left-style: dashed;
+}
+
+/* Schedule legend */
+.schedule-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  padding-left: 2px;
+}
+.legend-item { font-size: 11px; color: var(--text-muted); }
+.legend-going { color: #4ade80; }
+.legend-interested { color: var(--interested); }
+
 /* TBD section */
 .tbd-section { margin-top: 28px; }
 .tbd-section h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
 .tbd-list { display: flex; flex-direction: column; gap: 6px; }
-.tbd-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; font-size: 12px; }
+.tbd-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; font-size: 12px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.tbd-members { font-size: 11px; color: var(--text-muted); }
+
+/* ===== Schedule Modal ===== */
+.schedule-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.schedule-modal.hidden { display: none; }
+
+.schedule-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.schedule-modal-content {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.schedule-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 22px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.schedule-modal-close:hover { color: var(--text); background: var(--bg-hover); }
+
+.modal-title {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text);
+  margin-bottom: 6px;
+  padding-right: 36px;
+  line-height: 1.3;
+}
+
+.modal-speaker {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.modal-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.modal-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+
+.modal-members {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.modal-going { color: #4ade80; }
+.modal-interested { color: var(--interested); }
+
+body.light-mode .modal-going { color: #15803d; }
 
 /* ===== Settings ===== */
 .settings-container { max-width: 560px; display: flex; flex-direction: column; gap: 16px; }
@@ -891,6 +999,70 @@ body.light-mode .team-pill[data-status="going"] { color: #15803d; }
 }
 
 .theme-toggle-btn:hover { background: var(--bg-card); }
+
+/* ===== Mobile Responsive ===== */
+@media (max-width: 640px) {
+  /* Top bar — shrink brand text, make nav scroll horizontally */
+  #top-bar { padding: 0 10px; gap: 0; }
+
+  #brand { font-size: 13px; flex-shrink: 0; }
+
+  #main-nav {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    gap: 2px;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+  #main-nav::-webkit-scrollbar { display: none; }
+
+  .nav-link { padding: 6px 10px; font-size: 12px; white-space: nowrap; }
+
+  /* Reduce main content padding */
+  #main-content { padding: 12px; }
+
+  /* Filter strip */
+  #filter-strip { padding: 8px 10px; gap: 10px; }
+  .filter-label { font-size: 10px; }
+
+  /* Sessions — single column, tighter cards */
+  .sessions-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .session-card { padding: 12px; }
+  .card-footer { gap: 6px; }
+
+  /* List rows — stack meta+actions below title on very narrow screens */
+  .list-row { padding: 8px 10px; }
+  .list-row-main { flex-wrap: wrap; gap: 8px; }
+  .list-row-meta { order: 3; }
+  .list-row-actions { order: 4; }
+
+  /* Day headings */
+  .session-day-heading { font-size: 15px; }
+
+  /* Schedule grid — already overflow-x: auto, just reduce cell size */
+  .schedule-cell { min-height: 36px; padding: 3px 4px; }
+  .session-block-title { font-size: 10px; }
+  .schedule-time { font-size: 10px; padding: 4px 6px; }
+
+  /* Schedule modal — full-width on mobile */
+  .schedule-modal-content {
+    padding: 18px 16px;
+    max-height: 90vh;
+    border-radius: 8px;
+  }
+
+  /* Settings */
+  .settings-container { max-width: 100%; }
+  .settings-row { flex-wrap: wrap; }
+
+  /* About */
+  .about-page { padding: 20px 12px 40px; }
+  .about-section { padding: 14px 14px; }
+}
 
 /* ===== About Page ===== */
 .about-page {
